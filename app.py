@@ -21,8 +21,7 @@ from motGPT.render.pyrender.smpl_render import SMPLRender
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import librosa
 
-os.environ["DISPLAY"] = ":0.0"
-# os.environ['PYOPENGL_PLATFORM'] = 'egl'
+os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 
 # Load model
 cfg = parse_args(phase="webui")  # parse config file
@@ -59,12 +58,12 @@ forced_decoder_ids_en = audio_processor.get_decoder_prompt_ids(
 Video_Components = """
 <div class="side-video" style="position: relative;">
     <video width="340" autoplay loop>
-        <source src="file/{video_path}" type="video/mp4">
+        <source src="/gradio_api/file={video_path}" type="video/mp4">
     </video>
-    <a class="videodl-button" href="file/{video_path}" download="{video_fname}" title="Download Video">
+    <a class="videodl-button" href="/gradio_api/file={video_path}" download="{video_fname}" title="Download Video">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-video"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
     </a>
-    <a class="npydl-button" href="file/{motion_path}" download="{motion_fname}" title="Download Motion">
+    <a class="npydl-button" href="/gradio_api/file={motion_path}" download="{motion_fname}" title="Download Motion">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-box"><path d="M14.5 22H18a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M2.97 13.12c-.6.36-.97 1.02-.97 1.74v3.28c0 .72.37 1.38.97 1.74l3 1.83c.63.39 1.43.39 2.06 0l3-1.83c.6-.36.97-1.02.97-1.74v-3.28c0-.72-.37-1.38-.97-1.74l-3-1.83a1.97 1.97 0 0 0-2.06 0l-3 1.83Z"/><path d="m7 17-4.74-2.85"/><path d="m7 17 4.74-2.85"/><path d="M7 17v5"/></svg>
     </a>
 </div>
@@ -73,9 +72,9 @@ Video_Components = """
 Video_Components_example = """
 <div class="side-video" style="position: relative;">
     <video width="340" autoplay loop controls>
-        <source src="file/{video_path}" type="video/mp4">
+        <source src="/gradio_api/file={video_path}" type="video/mp4">
     </video>
-    <a class="npydl-button" href="file/{video_path}" download="{video_fname}" title="Download Video">
+    <a class="npydl-button" href="/gradio_api/file={video_path}" download="{video_fname}" title="Download Video">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-video"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
     </a>
 </div>
@@ -814,4 +813,5 @@ if __name__ == "__main__":
             server_port=8888,
             debug=True,
             show_api=False,
+            allowed_paths=[str(output_dir.resolve()), str(Path("assets").resolve())],
         )

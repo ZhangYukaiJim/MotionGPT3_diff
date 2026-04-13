@@ -6,7 +6,7 @@ TEST:
 
 DATASET:
   TASK_ROOT: deps/mGPT_instructions
-  SMPL_PATH: deps/smpl
+  SMPL_PATH: deps/smpl_models
   TRANSFORM_PATH: deps/transforms/
   WORD_VERTILIZER_PATH: deps/t2m/glove/
   KIT:
@@ -29,6 +29,6 @@ model:
 
 RENDER:
   BLENDER_PATH: libs/blender-2.93.2-linux-x64/blender
-  SMPL_MODEL_PATH: deps/smpl/smpl_models/smpl
-  MODEL_PATH: deps/smpl/smpl_models/
-  FACES_PATH: deps/smplh/smplh.faces
+  SMPL_MODEL_PATH: deps/smpl_models/smpl
+  MODEL_PATH: deps/smpl_models/
+  FACES_PATH: deps/smpl_models/smplh/smplh.faces

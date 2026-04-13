@@ -50,8 +50,10 @@ webui = [
     "smplx>=0.1.28",
 ]
 render = [
+    "chumpy==0.70",
     "natsort>=8.4.0",
     "smplx>=0.1.28",
+    "triangle>=20230923",
 ]
 blender = [
     "pytest-shutil>=1.8.1",
@@ -63,6 +65,9 @@ package = false
 [tool.uv.sources]
 torch = { index = "pytorch-cu118" }
 torchtext = { index = "pytorch-cu118" }
+
+[tool.uv.extra-build-dependencies]
+chumpy = ["pip"]
 
 [[tool.uv.index]]
 name = "pytorch-cu118"
