@@ -49,30 +49,33 @@ Extensive experiments show that our approach achieves competitive performance on
 <details open>
   <summary><b>Setup and download</b></summary>
 
-### 1. Conda environment
+### 1. Python environment with `uv`
+
+We test our code on Python 3.11 and PyTorch 2.0.0.
 
 ```
-conda create python=3.11 --name mgpt
-conda activate mgpt
+uv sync
+uv run python -m spacy download en_core_web_sm
 ```
 
-Install the packages in `requirements.txt` and install [PyTorch 2.0](https://pytorch.org/)
+If you want to run the web UI or rendering tools, install the optional extras too:
 
 ```
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
+uv sync --extra webui --extra render
 ```
 
-We test our code on Python 3.11.11 and PyTorch 2.0.0.
+The web UI currently uses `gradio==5.49.1` for compatibility with this repo.
 
 ### 2. Dependencies
 
-Run the script to download dependencies materials:
+Run the script to download dependency materials:
 
 ```
 bash prepare/download_smpl_model.sh
 bash prepare/prepare_gpt2.sh
 ```
+
+`prepare/prepare_gpt2.sh` now downloads GPT-2 directly through `transformers`, so `git-lfs` is not required.
 
 For Text to Motion Evaluation
 
@@ -80,15 +83,17 @@ For Text to Motion Evaluation
 bash prepare/download_t2m_evaluators.sh
 ```
 
+This archive extracts under `deps/t2m/` and provides the evaluator checkpoints and glove assets used by the HumanML3D/KIT pipelines.
+
 For pre-trained MotionVAE:
 
 ```
 bash prepare/download_mld_pretrained_models.sh
 ```
 
-Then run following script to process checkpoints:
+Then run the following script to process checkpoints:
 ```
-python -m scripts.gen_mot_gpt
+uv run python -m scripts.gen_mot_gpt
 ```
 
 ### 3. Pre-trained model
@@ -98,6 +103,8 @@ Run the script to download the pre-trained model
 ```
 bash prepare/download_pretrained_motiongpt3_model.sh
 ```
+
+This script saves the web UI checkpoint to `checkpoints/motiongpt3.ckpt`.
 
 ### 4. (Optional) Download manually
 
@@ -115,8 +122,23 @@ Visit [the Hugging Face](https://huggingface.co/OpenMotionLab/motiongpt3) to dow
 Run the following script to launch webui, then visit [0.0.0.0:8888](http://0.0.0.0:8888)
 
 ```
-python app.py
+uv run --extra webui python app.py
 ```
+
+Before launching the web UI, make sure you have completed all of the following:
+
+```bash
+uv sync --extra webui
+bash prepare/download_smpl_model.sh
+bash prepare/prepare_gpt2.sh
+bash prepare/download_t2m_evaluators.sh
+bash prepare/download_pretrained_motiongpt3_model.sh
+uv run python -m scripts.gen_mot_gpt
+```
+
+The default Whisper backend is `openai/whisper-large-v2`. On the first run, the model may be downloaded from Hugging Face and startup can take a while.
+
+If `uv run` prints a `VIRTUAL_ENV` mismatch warning, it means another virtual environment is currently active. `uv` will still use this project's `.venv`, but you can run `deactivate` first to avoid the warning.
 
 </details>
 
@@ -128,7 +150,7 @@ We support txt file input, the output motions are npy files and output texts are
 Then, run the following script:
 
 ```
-python demo.py --cfg ./configs/test.yaml --example ./assets/texts/t2m.txt
+uv run python demo.py --cfg ./configs/test.yaml --example ./assets/texts/t2m.txt
 ```
 
 Some parameters:
@@ -156,7 +178,7 @@ The outputs:
 4. (Optional) Refer to [MotionGPT-Training guidance](https://github.com/OpenMotionLab/MotionGPT/tree/main#22-ready-to-pretrain-motiongpt-model) to generate motion code for VQ-based training.
     ```
     bash prepare/download_motiongpt_pretrained_models.sh
-    python -m scripts.get_motion_code --cfg configs/config_motiongpt.yaml
+    uv run python -m scripts.get_motion_code --cfg configs/config_motiongpt.yaml
     ```
 
 
@@ -167,8 +189,8 @@ Please first check the parameters in `configs/MoT_vae_stage1_t2m.yaml`, e.g. `NA
 Then, run the following command:
 
 ```
-python -m scripts.gen_mot_gpt
-python -m train --cfg configs/MoT_vae_stage1_t2m.yaml --nodebug
+uv run python -m scripts.gen_mot_gpt
+uv run python -m train --cfg configs/MoT_vae_stage1_t2m.yaml --nodebug
 ```
 
 ### 2.2. Ready to pretrain MotionGPT3 model
@@ -178,8 +200,8 @@ Please update the parameters in `configs/MoT_vae_stage2_instruct.yaml` and `conf
 
 Then, run the following command:
 ```
-python -m train --cfg configs/MoT_vae_stage2_all.yaml --nodebug
-python -m train --cfg configs/MoT_vae_stage2_instruct.yaml --nodebug
+uv run python -m train --cfg configs/MoT_vae_stage2_all.yaml --nodebug
+uv run python -m train --cfg configs/MoT_vae_stage2_instruct.yaml --nodebug
 ```
 
 ### 2.3. Ready to instruct-tuning MotionGPT3 model
@@ -189,7 +211,7 @@ Please update the parameters in `configs/MoT_vae_stage3.yaml`, e.g. `NAME`, `ins
 Then, run the following command:
 
 ```
-python -m train --cfg configs/MoT_vae_stage3.yaml --nodebug
+uv run python -m train --cfg configs/MoT_vae_stage3.yaml --nodebug
 ```
 
 ### 3. Evaluate the model
@@ -199,7 +221,7 @@ Please first put the tained model checkpoint path to `TEST.CHECKPOINT` in config
 Then, run the following command:
 
 ```
-python -m test --cfg configs/MoT_vae_stage3.yaml --task t2m
+uv run python -m test --cfg configs/MoT_vae_stage3.yaml --task t2m
 ```
 
 Some parameters:
@@ -234,7 +256,7 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
 ### 2. Create SMPL meshes with:
 
 ```
-python -m fit --dir YOUR_NPY_FOLDER --save_folder TEMP_PLY_FOLDER --cuda
+uv run python -m fit --dir YOUR_NPY_FOLDER --save_folder TEMP_PLY_FOLDER --cuda
 ```
 
 This outputs:
