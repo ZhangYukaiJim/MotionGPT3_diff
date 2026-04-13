@@ -65,6 +65,7 @@ uv sync --extra webui --extra render
 ```
 
 The web UI currently uses `gradio==5.49.1` for compatibility with this repo.
+The `render` extra adds the legacy SMPL rendering dependencies used by the slow visualization path.
 
 ### 2. Dependencies
 
@@ -125,6 +126,12 @@ Run the following script to launch webui, then visit [0.0.0.0:8888](http://0.0.0
 uv run --extra webui python app.py
 ```
 
+If you want to use the slow SMPL renderer in the web UI, launch it with both extras:
+
+```bash
+uv run --extra webui --extra render python app.py
+```
+
 Before launching the web UI, make sure you have completed all of the following:
 
 ```bash
@@ -136,7 +143,15 @@ bash prepare/download_pretrained_motiongpt3_model.sh
 uv run python -m scripts.gen_mot_gpt
 ```
 
+For slow SMPL visualization, install the render extra too:
+
+```bash
+uv sync --extra webui --extra render
+```
+
 The default Whisper backend is `openai/whisper-large-v2`. On the first run, the model may be downloaded from Hugging Face and startup can take a while.
+
+On remote Linux servers without X11, the app uses headless EGL for the slow renderer by default.
 
 If `uv run` prints a `VIRTUAL_ENV` mismatch warning, it means another virtual environment is currently active. `uv` will still use this project's `.venv`, but you can run `deactivate` first to avoid the warning.
 
