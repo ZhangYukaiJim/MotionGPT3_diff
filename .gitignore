@@ -15,3 +15,7 @@ README0.md
 # assets/*
 test_folder.py
 ig-*.py
+/deps
+/checkpoints
+/cache
+outputs
