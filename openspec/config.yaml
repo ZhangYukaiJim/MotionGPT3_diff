@@ -1,0 +1,92 @@
+schema: spec-driven
+
+context: |
+  Project: MotionGPT3, the official codebase for "MotionGPT3: Human Motion as a Second Modality".
+  Domain: bimodal motion-language modeling for training, evaluation, batch demo generation, rendering, and web UI inference.
+
+  Main entrypoints:
+  - train.py for training
+  - test.py for evaluation
+  - demo.py for batch inference from prompt files
+  - app.py for the Gradio web UI
+  - fit.py, render.py, render_feats.py, and scripts/ for fitting, rendering, and helper workflows
+
+  Workflow:
+  - Runs are config-driven from configs/*.yaml plus configs/assets.yaml.
+  - motGPT/config.py merges asset config, default config, and experiment config via OmegaConf.
+  - Training outputs are written under experiments/<model>/<NAME>/ with logs, config snapshots, and checkpoints/.
+  - Test and demo outputs are typically written under results/<model>/<NAME>/samples_<TIME>/.
+  - Released or downloaded weights live under checkpoints/; downloaded external assets and evaluators live under deps/.
+  - The web UI writes temporary outputs under cache/.
+
+  Tech stack:
+  - Python >= 3.11, < 3.12 on Linux
+  - PyTorch 2.0.0 + PyTorch Lightning 2.0.0
+  - Transformers, spaCy, Gradio (optional), Blender/SMPL rendering dependencies (optional)
+  - OmegaConf/YAML configuration with interpolation
+  - CUDA-sensitive dependency setup through uv, currently targeting torch/cu118 in pyproject.toml
+
+  Environment and execution conventions:
+  - Use uv for dependency installation and command execution.
+  - Install with: uv sync
+  - Optional extras: uv sync --extra webui --extra render
+  - Run commands with uv run python ... and follow the repository's existing command style from README.md.
+  - Common commands include:
+    - uv run python -m train --cfg configs/MoT_vae_stage1_t2m.yaml --nodebug
+    - uv run python -m test --cfg configs/MoT_vae_stage3.yaml --task t2m
+    - uv run python demo.py --cfg ./configs/test.yaml --example ./assets/texts/t2m.txt
+    - uv run --extra webui python app.py
+  - If Python/CUDA/dependency assumptions change, update pyproject.toml and do not edit uv.lock manually.
+
+  Repository structure:
+  - configs/: experiment, asset, render, web UI, and default YAML configs
+  - motGPT/data/: datasets, datamodules, transforms, and motion preprocessing
+  - motGPT/models/: MotionGPT model variants and model builders
+  - motGPT/metrics/: evaluation metrics for text-motion tasks
+  - motGPT/render/: visualization and rendering pipelines
+  - motGPT/utils/: config, logging, checkpoint, geometry, and demo utilities
+  - scripts/: helper and preprocessing scripts
+  - prepare/: download/setup scripts for checkpoints, evaluators, and SMPL assets
+  - assets/: example prompts, media, CSS, and normalization stats
+  - checkpoints/: pretrained checkpoints
+  - deps/: external models, evaluators, SMPL assets, and task resources
+  - experiments/: training artifacts
+  - results/: evaluation/demo artifacts
+
+  Motion/data conventions:
+  - Primary datasets and configs reference HumanML3D, with KIT and MotionX settings also present.
+  - Common tasks include t2m, m2t, t2t, pred, and inbetween.
+  - Motion outputs are often stored as .npy arrays; generated joint outputs are commonly shaped (nframe, 22, 3).
+  - Motion feature dimensions and dataset limits are config-driven; default HumanML3D features use 263 dims.
+  - Rendering and fitting flows may also produce SMPL vertices or mesh artifacts.
+
+  Documentation conventions:
+  - Keep source comments short and necessary.
+  - Put high-level intent, setup details, workflow notes, and usage examples in README.md or nearby markdown files when present.
+  - This repo does not currently have a dedicated docs/ tree; prefer updating README.md or colocated markdown such as package-level README files.
+  - For scripts and CLI workflows, include concrete uv run python ... or bash usage examples.
+
+  Git convention:
+  - Do not create commits unless the user explicitly asks.
+
+rules:
+  proposal:
+    - Explain why the change is needed for MotionGPT3 training, evaluation, demo generation, rendering, or web UI workflows.
+    - List affected tasks, datasets, and components explicitly when relevant, such as t2m, m2t, t2t, pred, inbetween, HumanML3D, KIT, MotionX, VAE, LM, metrics, render, or web UI.
+    - Include scope boundaries and non-goals so proposals stay incremental and compatible with the current codebase.
+    - Describe expected impact on configs/, experiments/, results/, checkpoints/, cache/, or deps/ when those artifacts change.
+  specs:
+    - Define requirements with concrete input and output expectations, including tensor, feature, or array shapes when relevant.
+    - State compatibility requirements for existing config-driven runs based on configs/assets.yaml, configs/default.yaml, and per-experiment YAML files.
+    - Include at least one scenario per requirement with clear pass/fail behavior.
+    - Call out dataset split assumptions, motion representation assumptions, frame-rate expectations, or checkpoint/config prerequisites if touched.
+  design:
+    - Map the design to current architecture paths such as train.py, test.py, demo.py, app.py, motGPT/config.py, motGPT/data/, motGPT/models/, motGPT/metrics/, motGPT/render/, and configs/.
+    - Document tradeoffs and failure modes, including GPU memory, checkpoint compatibility, optional dependency extras, downloaded asset prerequisites, and rendering/runtime costs.
+    - Specify where README.md or nearby markdown documentation must be updated when behavior, setup, or usage changes.
+    - Avoid unnecessary framework churn; prefer incremental integration with the current OmegaConf-driven modules and existing task/config patterns.
+  tasks:
+    - Break tasks into small, verifiable steps with concrete file paths.
+    - Include implementation, validation, and documentation updates as explicit tasks.
+    - Include runnable validation commands using uv run that match the affected workflow.
+    - Do not include any commit task unless explicitly requested by the user.
