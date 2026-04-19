@@ -1,0 +1,34 @@
+CONFIG_FOLDER: configs # Config files path
+FOLDER: experiments # Experiment files saving path
+
+TEST:
+  FOLDER: results # Testing files saving path
+
+DATASET:
+  TASK_ROOT: deps/mGPT_instructions
+  SMPL_PATH: deps/smpl_models
+  TRANSFORM_PATH: deps/transforms/
+  WORD_VERTILIZER_PATH: deps/t2m/glove/
+  KIT:
+    ROOT: datasets/kit-ml # KIT directory
+    SPLIT_ROOT: datasets/kit-ml # KIT splits directory
+    MEAN_STD_PATH: deps/t2m/t2m/
+  HUMANML3D:
+    ROOT: /home/yzhanghe/HumanML3D/HumanML3D
+    SPLIT_ROOT: /home/yzhanghe/HumanML3D/HumanML3D
+    MEAN_STD_PATH: deps/t2m/t2m/
+
+METRIC:
+  TM2T:
+    t2m_path: deps/t2m/t2m/ # path for tm2t evaluator
+  TMR:
+    tmr_path: deps/tmr/tmr_humanml3d_guoh3dfeats/
+
+model:
+  whisper_path: openai/whisper-large-v2 # path or Hugging Face model ID for whisper, webui only
+
+RENDER:
+  BLENDER_PATH: libs/blender-2.93.2-linux-x64/blender
+  SMPL_MODEL_PATH: deps/smpl_models/smpl
+  MODEL_PATH: deps/smpl_models/
+  FACES_PATH: deps/smpl_models/smplh/smplh.faces
