@@ -1,15 +1,18 @@
 import os
-import torch
 import time
+from pathlib import Path
+
 import imageio
-import numpy as np
 import moviepy.editor as mp
+import numpy as np
+import torch
 from scipy.spatial.transform import Rotation as RRR
 import motGPT.render.matplot.plot_3d_global as plot_3d
 from motGPT.render.pyrender.hybrik_loc2rot import HybrIKJointsToRotmat
 from motGPT.render.pyrender.smpl_render import SMPLRender
 
 SMPL_MODEL_PATH = "deps/smpl_models/smpl"
+STATIC_RENDER_CACHE_VERSION = "v1"
 
 
 def _prepare_fast_render_frames(data, fps=20):
@@ -105,3 +108,80 @@ def render_motion_side_by_side(
     del left_frames
     del right_frames
     del stacked_frames
+
+
+def get_render_cache_dir(
+    dataset_root,
+    task,
+    fps=20,
+    method="fast",
+    version=STATIC_RENDER_CACHE_VERSION,
+):
+    return Path(dataset_root) / "render_cache" / task / f"{method}_fps{fps}_{version}"
+
+
+def _symlink_cached_video(cache_path, output_path):
+    cache_path = Path(cache_path).resolve()
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if output_path.is_symlink():
+        if os.path.realpath(output_path) == str(cache_path):
+            return str(output_path)
+        output_path.unlink()
+    elif output_path.exists():
+        output_path.unlink()
+
+    output_path.symlink_to(cache_path)
+    return str(output_path)
+
+
+def materialize_cached_motion_render(
+    data,
+    cache_dir,
+    cache_key,
+    output_dir,
+    output_name=None,
+    method="fast",
+    fps=20,
+):
+    cache_dir = Path(cache_dir)
+    cache_path = cache_dir / f"{cache_key}.mp4"
+    if not cache_path.exists():
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        render_motion(
+            data,
+            None,
+            output_dir=cache_dir,
+            fname=cache_key,
+            method=method,
+            fps=fps,
+        )
+
+    output_stem = output_name or cache_key
+    return _symlink_cached_video(cache_path, Path(output_dir) / f"{output_stem}.mp4")
+
+
+def materialize_cached_motion_side_by_side_render(
+    data_left,
+    data_right,
+    cache_dir,
+    cache_key,
+    output_dir,
+    output_name=None,
+    fps=20,
+):
+    cache_dir = Path(cache_dir)
+    cache_path = cache_dir / f"{cache_key}.mp4"
+    if not cache_path.exists():
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        render_motion_side_by_side(
+            data_left,
+            data_right,
+            output_dir=cache_dir,
+            fname=cache_key,
+            fps=fps,
+        )
+
+    output_stem = output_name or cache_key
+    return _symlink_cached_video(cache_path, Path(output_dir) / f"{output_stem}.mp4")
