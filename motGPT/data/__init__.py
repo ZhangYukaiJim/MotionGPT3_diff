@@ -22,30 +22,31 @@ class BASEDataModule(pl.LightningDataModule):
     @property
     def train_dataset(self):
         if self._train_dataset is None:
-            self._train_dataset = self.Dataset(split=self.cfg.TRAIN.SPLIT,
-                                               **self.hparams)
+            self._train_dataset = self.Dataset(
+                split=self.cfg.TRAIN.SPLIT, **self.hparams
+            )
         return self._train_dataset
 
     @property
     def val_dataset(self):
-        print('val_dataset',self.cfg.EVAL.SPLIT)
+        print("val_dataset", self.cfg.EVAL.SPLIT)
         if self._val_dataset is None:
             params = self.hparams.copy()
             # params['code_path'] = None
-            params['split'] = self.cfg.EVAL.SPLIT
+            params["split"] = self.cfg.EVAL.SPLIT
             self._val_dataset = self.DatasetEval(**params)
         return self._val_dataset
 
     @property
     def test_dataset(self):
-        print('test_dataset',self.cfg.TEST.SPLIT)
+        print("test_dataset", self.cfg.TEST.SPLIT)
         if self._test_dataset is None:
             # self._test_dataset = self.DatasetEval(split=self.cfg.TEST.SPLIT,
             #                                       **self.hparams)
             params = self.hparams.copy()
             # params['code_path'] = None
-            params['split'] = self.cfg.TEST.SPLIT
-            self._test_dataset = self.DatasetEval( **params)
+            params["split"] = self.cfg.TEST.SPLIT
+            self._test_dataset = self.DatasetEval(**params)
         return self._test_dataset
 
     def setup(self, stage=None):
@@ -60,22 +61,23 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options = self.dataloader_options.copy()
         dataloader_options["batch_size"] = self.cfg.TRAIN.BATCH_SIZE
         dataloader_options["num_workers"] = self.cfg.TRAIN.NUM_WORKERS
+        dataloader_options["shuffle"] = True
+        persistent_workers = dataloader_options["num_workers"] > 0
         return DataLoader(
             self.train_dataset,
-            shuffle=False,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
             **dataloader_options,
         )
 
     def predict_dataloader(self):
         dataloader_options = self.dataloader_options.copy()
-        dataloader_options[
-            "batch_size"] = 1 if self.is_mm else self.cfg.TEST.BATCH_SIZE
+        dataloader_options["batch_size"] = 1 if self.is_mm else self.cfg.TEST.BATCH_SIZE
         dataloader_options["num_workers"] = self.cfg.TEST.NUM_WORKERS
         dataloader_options["shuffle"] = False
+        persistent_workers = dataloader_options["num_workers"] > 0
         return DataLoader(
             self.test_dataset,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
             **dataloader_options,
         )
 
@@ -85,21 +87,22 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options["batch_size"] = self.cfg.EVAL.BATCH_SIZE
         dataloader_options["num_workers"] = self.cfg.EVAL.NUM_WORKERS
         dataloader_options["shuffle"] = False
+        persistent_workers = dataloader_options["num_workers"] > 0
         return DataLoader(
             self.val_dataset,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
             **dataloader_options,
         )
 
     def test_dataloader(self):
         # overrides batch_size and num_workers
         dataloader_options = self.dataloader_options.copy()
-        dataloader_options[
-            "batch_size"] = 1 if self.is_mm else self.cfg.TEST.BATCH_SIZE
+        dataloader_options["batch_size"] = 1 if self.is_mm else self.cfg.TEST.BATCH_SIZE
         dataloader_options["num_workers"] = self.cfg.TEST.NUM_WORKERS
         dataloader_options["shuffle"] = False
+        persistent_workers = dataloader_options["num_workers"] > 0
         return DataLoader(
             self.test_dataset,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
             **dataloader_options,
         )

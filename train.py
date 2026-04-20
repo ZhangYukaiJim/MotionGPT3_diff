@@ -8,6 +8,7 @@ from motGPT.models.build_model import build_model
 from motGPT.utils.logger import create_logger
 from motGPT.utils.load_checkpoint import load_pretrained, load_pretrained_vae
 
+
 def main():
     # Configs
     cfg = parse_args(phase="train")  # parse config file
@@ -25,19 +26,23 @@ def main():
     # Metric Logger
     pl_loggers = []
     for loggerName in cfg.LOGGER.TYPE:
-        if loggerName == 'tenosrboard' or cfg.LOGGER.WANDB.params.project:
+        if loggerName == "tenosrboard" or cfg.LOGGER.WANDB.params.project:
             pl_logger = instantiate_from_config(
-                eval(f'cfg.LOGGER.{loggerName.upper()}'))
+                eval(f"cfg.LOGGER.{loggerName.upper()}")
+            )
             pl_loggers.append(pl_logger)
 
     # Callbacks
-    callbacks = build_callbacks(cfg, logger=logger, phase='train')
+    callbacks = build_callbacks(cfg, logger=logger, phase="train")
     logger.info("Callbacks initialized")
 
     # Dataset
     datamodule = build_data(cfg)
-    logger.info("datasets module {} initialized".format("".join(
-        cfg.DATASET.target.split('.')[-2])))
+    logger.info(
+        "datasets module {} initialized".format(
+            "".join(cfg.DATASET.target.split(".")[-2])
+        )
+    )
 
     # Model
     model = build_model(cfg, datamodule)
@@ -45,24 +50,29 @@ def main():
 
     # Seed
     pl.seed_everything(cfg.SEED_VALUE)
-    
+
     # Lightning Trainer
-    trainer = pl.Trainer(
-        default_root_dir=cfg.FOLDER_EXP,
-        max_epochs=cfg.TRAIN.END_EPOCH,
+    trainer_kwargs = {
+        "default_root_dir": cfg.FOLDER_EXP,
+        "max_epochs": cfg.TRAIN.END_EPOCH,
         # precision='16',
-        logger=pl_loggers,
-        callbacks=callbacks,
-        check_val_every_n_epoch=cfg.LOGGER.VAL_EVERY_STEPS,
-        accelerator=cfg.ACCELERATOR,
-        devices=cfg.DEVICE,
-        num_nodes=cfg.NUM_NODES,
-        strategy="ddp_find_unused_parameters_true"
-        if len(cfg.DEVICE) > 1 else 'auto',
-        benchmark=False,
-        deterministic=False,
-        accumulate_grad_batches=cfg.TRAIN.accumulate_grad_batches,
-    )
+        "logger": pl_loggers,
+        "callbacks": callbacks,
+        "check_val_every_n_epoch": cfg.LOGGER.VAL_EVERY_STEPS,
+        "accelerator": cfg.ACCELERATOR,
+        "devices": cfg.DEVICE,
+        "num_nodes": cfg.NUM_NODES,
+        "strategy": "ddp_find_unused_parameters_true"
+        if len(cfg.DEVICE) > 1
+        else "auto",
+        "benchmark": False,
+        "deterministic": False,
+        "accumulate_grad_batches": cfg.TRAIN.accumulate_grad_batches,
+    }
+    if "TRAINER" in cfg and cfg.TRAINER is not None:
+        trainer_kwargs.update(OmegaConf.to_container(cfg.TRAINER, resolve=True))
+
+    trainer = pl.Trainer(**trainer_kwargs)
     logger.info("Trainer initialized")
 
     # Strict load pretrianed model
@@ -81,15 +91,12 @@ def main():
 
     # Lightning Fitting
     if cfg.TRAIN.RESUME:
-        trainer.fit(model,
-                    datamodule=datamodule,
-                    ckpt_path=cfg.TRAIN.PRETRAINED)
+        trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.TRAIN.PRETRAINED)
     else:
         trainer.fit(model, datamodule=datamodule)
 
     # Training ends
-    logger.info(
-        f"The outputs of this experiment are stored in {cfg.FOLDER_EXP}")
+    logger.info(f"The outputs of this experiment are stored in {cfg.FOLDER_EXP}")
     logger.info("Training ends!")
 
 

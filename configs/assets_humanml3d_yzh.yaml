@@ -17,6 +17,9 @@ DATASET:
     ROOT: /home/yzhanghe/HumanML3D/HumanML3D
     SPLIT_ROOT: /home/yzhanghe/HumanML3D/HumanML3D
     MEAN_STD_PATH: deps/t2m/t2m/
+  MOTIONFIX:
+    ROOT: /opt/data/motionfix-dataset
+    CACHE_ROOT: /opt/data/motionfix-dataset/mgpt_humanml_cache
 
 METRIC:
   TM2T:

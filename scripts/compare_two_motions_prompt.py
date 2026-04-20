@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from motGPT.config import parse_args
 from motGPT.data.build_data import build_data
 from motGPT.models.build_model import build_model
+from motGPT.utils.logger import create_logger
 
 
 def load_model_and_cfg(cfg_path: str):
@@ -24,6 +25,8 @@ def load_model_and_cfg(cfg_path: str):
     finally:
         sys.argv = argv_backup
 
+    _ = create_logger(cfg, phase="demo")
+
     pl.seed_everything(cfg.SEED_VALUE)
     if cfg.ACCELERATOR == "gpu":
         device = torch.device("cuda")
@@ -32,7 +35,10 @@ def load_model_and_cfg(cfg_path: str):
 
     datamodule = build_data(cfg)
     model = build_model(cfg, datamodule).eval()
-    state_dict = torch.load(cfg.TEST.CHECKPOINTS, map_location="cpu")["state_dict"]
+    checkpoint_path = cfg.TEST.CHECKPOINTS
+    if not checkpoint_path or not Path(checkpoint_path).exists():
+        checkpoint_path = cfg.TRAIN.PRETRAINED
+    state_dict = torch.load(checkpoint_path, map_location="cpu")["state_dict"]
     model.load_state_dict(state_dict, strict=False)
     model.to(device)
     return cfg, datamodule, model, device
@@ -96,7 +102,9 @@ def main():
         help="Prompt to send to the released checkpoint",
     )
     parser.add_argument(
-        "--cfg", default="./configs/webui.yaml", help="Config file to load"
+        "--cfg",
+        default="./configs/MoT_vae_stage4_motionfix_yzh.yaml",
+        help="Config file to load",
     )
     parser.add_argument(
         "--max-length", type=int, default=80, help="Max generated text length"

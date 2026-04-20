@@ -7,7 +7,8 @@ import numpy as np
 def lengths_to_mask(lengths):
     max_len = max(lengths)
     mask = torch.arange(max_len, device=lengths.device).expand(
-        len(lengths), max_len) < lengths.unsqueeze(1)
+        len(lengths), max_len
+    ) < lengths.unsqueeze(1)
     return mask
 
 
@@ -18,7 +19,7 @@ def collate_tensors(batch):
 
     dims = batch[0].dim()
     max_size = [max([b.size(i) for b in batch]) for i in range(dims)]
-    size = (len(batch), ) + tuple(max_size)
+    size = (len(batch),) + tuple(max_size)
     canvas = batch[0].new_zeros(size=size)
     for i, b in enumerate(batch):
         sub_tensor = canvas[i]
@@ -26,6 +27,7 @@ def collate_tensors(batch):
             sub_tensor = sub_tensor.narrow(d, 0, b.size(d))
         sub_tensor.add_(b)
     return canvas
+
 
 def humanml3d_collate(batch):
     notnone_batches = [b for b in batch if b is not None]
@@ -38,39 +40,50 @@ def humanml3d_collate(batch):
     adapted_batch = {}
     # Motion only
     if notnone_batches[0][3] is not None:
-        adapted_batch.update({
-            "motion":
-            collate_tensors([torch.tensor(b[3]).float() for b in notnone_batches]),
-            "length": [b[4] for b in notnone_batches],
-            })
+        adapted_batch.update(
+            {
+                "motion": collate_tensors(
+                    [torch.tensor(b[3]).float() for b in notnone_batches]
+                ),
+                "length": [b[4] for b in notnone_batches],
+            }
+        )
     if notnone_batches[0][1] is not None:
-        adapted_batch.update({
-            "m_tokens":
-            collate_tensors([torch.tensor(b[1]).float() for b in notnone_batches]),
-            "m_tokens_len": [b[2] for b in notnone_batches],
-        })
+        adapted_batch.update(
+            {
+                "m_tokens": collate_tensors(
+                    [torch.tensor(b[1]).float() for b in notnone_batches]
+                ),
+                "m_tokens_len": [b[2] for b in notnone_batches],
+            }
+        )
 
     # Text and motion
     if notnone_batches[0][0] is not None:
-        adapted_batch.update({
-            "text": [b[0] for b in notnone_batches],
-            "all_captions": [b[9] for b in notnone_batches],
-        })
+        adapted_batch.update(
+            {
+                "text": [b[0] for b in notnone_batches],
+                "all_captions": [b[9] for b in notnone_batches],
+            }
+        )
 
     # Evaluation related
     if EvalFlag:
-        adapted_batch.update({
-            "text": [b[0] for b in notnone_batches],
-            "word_embs":
-            collate_tensors(
-                [torch.tensor(b[5]).float() for b in notnone_batches]),
-            "pos_ohot":
-            collate_tensors(
-                [torch.tensor(b[6]).float() for b in notnone_batches]),
-            "text_len":
-            collate_tensors([torch.tensor(b[7]) for b in notnone_batches]),
-            "tokens": [b[8] for b in notnone_batches],
-        })
+        adapted_batch.update(
+            {
+                "text": [b[0] for b in notnone_batches],
+                "word_embs": collate_tensors(
+                    [torch.tensor(b[5]).float() for b in notnone_batches]
+                ),
+                "pos_ohot": collate_tensors(
+                    [torch.tensor(b[6]).float() for b in notnone_batches]
+                ),
+                "text_len": collate_tensors(
+                    [torch.tensor(b[7]) for b in notnone_batches]
+                ),
+                "tokens": [b[8] for b in notnone_batches],
+            }
+        )
 
     # Tasks
     if len(notnone_batches[0]) > 10:
@@ -83,11 +96,32 @@ def humanml3d_collate(batch):
     return adapted_batch
 
 
+def motionfix_collate(batch):
+    notnone_batches = [b for b in batch if b is not None]
+    adapted_batch = {
+        "text": [b["text"] for b in notnone_batches],
+        "all_captions": [b["all_captions"] for b in notnone_batches],
+        "motion_source": collate_tensors(
+            [torch.tensor(b["motion_source"]).float() for b in notnone_batches]
+        ),
+        "motion_target": collate_tensors(
+            [torch.tensor(b["motion_target"]).float() for b in notnone_batches]
+        ),
+        "length_source": [b["length_source"] for b in notnone_batches],
+        "length_target": [b["length_target"] for b in notnone_batches],
+        "fname": [b["fname"] for b in notnone_batches],
+        "tasks": [b["tasks"] for b in notnone_batches],
+    }
+    adapted_batch["motion"] = adapted_batch["motion_target"]
+    adapted_batch["length"] = adapted_batch["length_target"]
+    return adapted_batch
+
+
 def load_pkl(path, description=None, progressBar=False):
     if progressBar:
-        with rich.progress.open(path, 'rb', description=description) as file:
+        with rich.progress.open(path, "rb", description=description) as file:
             data = pickle.load(file)
     else:
-        with open(path, 'rb') as file:
+        with open(path, "rb") as file:
             data = pickle.load(file)
     return data

@@ -3,18 +3,22 @@ from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import Callback, RichProgressBar, ModelCheckpoint
 
 
-def build_callbacks(cfg, logger=None, phase='test', **kwargs):
+def build_callbacks(cfg, logger=None, phase="test", **kwargs):
     callbacks = []
     logger = logger
+    enable_checkpointing = True
+    if "TRAINER" in cfg and cfg.TRAINER is not None:
+        enable_checkpointing = cfg.TRAINER.get("enable_checkpointing", True)
 
     # Rich Progress Bar
     callbacks.append(progressBar())
 
     # Checkpoint Callback
-    if phase == 'train':
+    if phase == "train" and enable_checkpointing:
         callbacks.extend(getCheckpointCallback(cfg, logger=logger, **kwargs))
-        
+
     return callbacks
+
 
 def getCheckpointCallback(cfg, logger=None, **kwargs):
     callbacks = []
@@ -40,119 +44,87 @@ def getCheckpointCallback(cfg, logger=None, **kwargs):
         "Accuracy": "Metrics/accuracy",
     }
     callbacks.append(
-        progressLogger(logger,metric_monitor=metric_monitor,log_every_n_steps=1))
+        progressLogger(logger, metric_monitor=metric_monitor, log_every_n_steps=1)
+    )
 
     # Save 10 latest checkpoints
     checkpointParams = {
-        'dirpath': os.path.join(cfg.FOLDER_EXP, "checkpoints"),
-        'filename': "{epoch}",
-        'monitor': "step",
-        'mode': "max",
-        'every_n_epochs': cfg.LOGGER.VAL_EVERY_STEPS,
-        'save_top_k': 1,
-        'save_last': True,
-        'save_on_train_epoch_end': True
+        "dirpath": os.path.join(cfg.FOLDER_EXP, "checkpoints"),
+        "filename": "{epoch}",
+        "monitor": "step",
+        "mode": "max",
+        "every_n_epochs": cfg.LOGGER.VAL_EVERY_STEPS,
+        "save_top_k": 1,
+        "save_last": True,
+        "save_on_train_epoch_end": True,
     }
     callbacks.append(ModelCheckpoint(**checkpointParams))
 
     # Save checkpoint every n*5 epochs
-    checkpointParams.update({
-        'every_n_epochs':
-        cfg.LOGGER.VAL_EVERY_STEPS*5,
-        'save_top_k':
-        -1,
-        'save_last':
-        False
-    })
+    checkpointParams.update(
+        {
+            "every_n_epochs": cfg.LOGGER.VAL_EVERY_STEPS * 5,
+            "save_top_k": -1,
+            "save_last": False,
+        }
+    )
     callbacks.append(ModelCheckpoint(**checkpointParams))
 
     metrics = cfg.METRIC.TYPE
     metric_monitor_map = {
-        'TemosMetric': {
-            'Metrics/APE_root': {
-                'abbr': 'APEroot',
-                'mode': 'min'
-            },
+        "TemosMetric": {
+            "Metrics/APE_root": {"abbr": "APEroot", "mode": "min"},
         },
-        'M2TMetrics': {
-            'Metrics/Matching_score':{
-                'abbr': 'MMDist',
-                'mode': 'min'
-            },
-            'Metrics/R_precision_top_3': {
-                'abbr': 'R3',
-                'mode': 'max'
-            }
+        "M2TMetrics": {
+            "Metrics/Matching_score": {"abbr": "MMDist", "mode": "min"},
+            "Metrics/R_precision_top_3": {"abbr": "R3", "mode": "max"},
         },
-        'TM2TMetrics': {
-            'Metrics/FID': {
-                'abbr': 'FID',
-                'mode': 'min'
-            },
-            'Metrics/R_precision_top_3': {
-                'abbr': 'R3',
-                'mode': 'max'
-            }
+        "TM2TMetrics": {
+            "Metrics/FID": {"abbr": "FID", "mode": "min"},
+            "Metrics/R_precision_top_3": {"abbr": "R3", "mode": "max"},
         },
-        'MRMetrics': {
-            'Metrics/MPJPE': {
-                'abbr': 'MPJPE',
-                'mode': 'min'
-            }
-        },
-        'HUMANACTMetrics': {
-            'Metrics/Accuracy': {
-                'abbr': 'Accuracy',
-                'mode': 'max'
-            }
-        },
-        'UESTCMetrics': {
-            'Metrics/Accuracy': {
-                'abbr': 'Accuracy',
-                'mode': 'max'
-            }
-        },
-        'UncondMetrics': {
-            'Metrics/FID': {
-                'abbr': 'FID',
-                'mode': 'min'
-            }
-        }
+        "MRMetrics": {"Metrics/MPJPE": {"abbr": "MPJPE", "mode": "min"}},
+        "HUMANACTMetrics": {"Metrics/Accuracy": {"abbr": "Accuracy", "mode": "max"}},
+        "UESTCMetrics": {"Metrics/Accuracy": {"abbr": "Accuracy", "mode": "max"}},
+        "UncondMetrics": {"Metrics/FID": {"abbr": "FID", "mode": "min"}},
     }
 
-    checkpointParams.update({
-        'every_n_epochs': cfg.LOGGER.VAL_EVERY_STEPS,
-        'save_top_k': 1,
-    })
+    checkpointParams.update(
+        {
+            "every_n_epochs": cfg.LOGGER.VAL_EVERY_STEPS,
+            "save_top_k": 1,
+        }
+    )
 
     for metric in metrics:
         if metric in metric_monitor_map.keys():
             metric_monitors = metric_monitor_map[metric]
 
             # Delete R3 if training VAE
-            if cfg.TRAIN.STAGE == 'vae' and metric == 'TM2TMetrics':
-                del metric_monitors['Metrics/R_precision_top_3']
-            elif 'MotionX' in cfg.DATASET.target and metric == 'TM2TMetrics':
-                del metric_monitors['Metrics/R_precision_top_3']
+            if cfg.TRAIN.STAGE == "vae" and metric == "TM2TMetrics":
+                del metric_monitors["Metrics/R_precision_top_3"]
+            elif "MotionX" in cfg.DATASET.target and metric == "TM2TMetrics":
+                del metric_monitors["Metrics/R_precision_top_3"]
 
             for metric_monitor in metric_monitors:
-                checkpointParams.update({
-                    'filename':
-                    metric_monitor_map[metric][metric_monitor]['mode']
-                    + "-" +
-                    metric_monitor_map[metric][metric_monitor]['abbr']
-                    + "{ep}",
-                    'monitor':
-                    metric_monitor,
-                    'mode':
-                    metric_monitor_map[metric][metric_monitor]['mode'],
-                })
-                callbacks.append(
-                    ModelCheckpoint(**checkpointParams))
+                checkpointParams.update(
+                    {
+                        "filename": metric_monitor_map[metric][metric_monitor]["mode"]
+                        + "-"
+                        + metric_monitor_map[metric][metric_monitor]["abbr"]
+                        + "{ep}",
+                        "monitor": metric_monitor,
+                        "mode": metric_monitor_map[metric][metric_monitor]["mode"],
+                    }
+                )
+                callbacks.append(ModelCheckpoint(**checkpointParams))
     return callbacks
 
+
 class progressBar(RichProgressBar):
-    def __init__(self, ):
+    def __init__(
+        self,
+    ):
         super().__init__()
 
     def get_metrics(self, trainer, model):
@@ -161,36 +133,40 @@ class progressBar(RichProgressBar):
         items.pop("v_num", None)
         return items
 
+
 class progressLogger(Callback):
-    def __init__(self,
-                 logger,
-                 metric_monitor: dict,
-                 precision: int = 3,
-                 log_every_n_steps: int = 1):
+    def __init__(
+        self,
+        logger,
+        metric_monitor: dict,
+        precision: int = 3,
+        log_every_n_steps: int = 1,
+    ):
         # Metric to monitor
         self.logger = logger
         self.metric_monitor = metric_monitor
         self.precision = precision
         self.log_every_n_steps = log_every_n_steps
 
-    def on_train_start(self, trainer: Trainer, pl_module: LightningModule,
-                       **kwargs) -> None:
+    def on_train_start(
+        self, trainer: Trainer, pl_module: LightningModule, **kwargs
+    ) -> None:
         self.logger.info("Training started")
 
-    def on_train_end(self, trainer: Trainer, pl_module: LightningModule,
-                     **kwargs) -> None:
+    def on_train_end(
+        self, trainer: Trainer, pl_module: LightningModule, **kwargs
+    ) -> None:
         self.logger.info("Training done")
 
-    def on_validation_epoch_end(self, trainer: Trainer,
-                                pl_module: LightningModule, **kwargs) -> None:
+    def on_validation_epoch_end(
+        self, trainer: Trainer, pl_module: LightningModule, **kwargs
+    ) -> None:
         if trainer.sanity_checking:
             self.logger.info("Sanity checking ok.")
 
-    def on_train_epoch_end(self,
-                           trainer: Trainer,
-                           pl_module: LightningModule,
-                           padding=False,
-                           **kwargs) -> None:
+    def on_train_epoch_end(
+        self, trainer: Trainer, pl_module: LightningModule, padding=False, **kwargs
+    ) -> None:
         metric_format = f"{{:.{self.precision}e}}"
         line = f"Epoch {trainer.current_epoch}"
         if padding:

@@ -1,4 +1,3 @@
-
 import os
 import torch
 import time
@@ -10,28 +9,45 @@ import motGPT.render.matplot.plot_3d_global as plot_3d
 from motGPT.render.pyrender.hybrik_loc2rot import HybrIKJointsToRotmat
 from motGPT.render.pyrender.smpl_render import SMPLRender
 
-SMPL_MODEL_PATH = 'deps/smpl_models/smpl'
+SMPL_MODEL_PATH = "deps/smpl_models/smpl"
 
-def render_motion(data, feats, output_dir, fname=None, method='fast', smpl_model_path=SMPL_MODEL_PATH, fps=20):
+
+def _prepare_fast_render_frames(data, fps=20):
+    if len(data.shape) == 3:
+        data = data[None]
+    if isinstance(data, torch.Tensor):
+        data = data.cpu().numpy()
+    return plot_3d.draw_to_batch(data, [""], None, fps=fps)[0].cpu().numpy()
+
+
+def render_motion(
+    data,
+    feats,
+    output_dir,
+    fname=None,
+    method="fast",
+    smpl_model_path=SMPL_MODEL_PATH,
+    fps=20,
+):
     if fname is None:
-        fname = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(
-            time.time())) + str(np.random.randint(10000, 99999))
-    video_fname = fname + '.mp4'
-    feats_fname = fname + '.npy'
+        fname = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) + str(
+            np.random.randint(10000, 99999)
+        )
+    video_fname = fname + ".mp4"
+    feats_fname = fname + ".npy"
     output_npy_path = os.path.join(output_dir, feats_fname)
     output_mp4_path = os.path.join(output_dir, video_fname)
     # np.save(output_npy_path, feats)
 
-    if method == 'slow':
+    if method == "slow":
         if len(data.shape) == 4:
             data = data[0]
         data = data - data[0, 0]
         pose_generator = HybrIKJointsToRotmat()
         pose = pose_generator(data)
-        pose = np.concatenate([
-            pose,
-            np.stack([np.stack([np.eye(3)] * pose.shape[0], 0)] * 2, 1)
-        ], 1)
+        pose = np.concatenate(
+            [pose, np.stack([np.stack([np.eye(3)] * pose.shape[0], 0)] * 2, 1)], 1
+        )
         shape = [768, 768]
         render = SMPLRender(smpl_model_path)
 
@@ -41,9 +57,7 @@ def render_motion(data, feats, output_dir, fname=None, method='fast', smpl_model
         aroot = data[:, 0].copy()
         aroot[:, 1] = -aroot[:, 1]
         aroot[:, 2] = -aroot[:, 2]
-        params = dict(pred_shape=np.zeros([1, 10]),
-                      pred_root=aroot,
-                      pred_pose=pose)
+        params = dict(pred_shape=np.zeros([1, 10]), pred_root=aroot, pred_pose=pose)
         render.init_renderer([shape[0], shape[1], 3], params)
         for i in range(data.shape[0]):
             renderImg = render.render(i)
@@ -54,16 +68,40 @@ def render_motion(data, feats, output_dir, fname=None, method='fast', smpl_model
         out_video.write_videofile(output_mp4_path, fps=fps)
         del render
 
-    elif method == 'fast':
-        output_gif_path = output_mp4_path[:-4] + '.gif'
-        if len(data.shape) == 3:
-            data = data[None]
-        if isinstance(data, torch.Tensor):
-            data = data.cpu().numpy()
-        pose_vis = plot_3d.draw_to_batch(data, [''], None, fps=fps)[0].cpu().numpy()
+    elif method == "fast":
+        output_gif_path = output_mp4_path[:-4] + ".gif"
+        pose_vis = _prepare_fast_render_frames(data, fps=fps)
 
-        out_video = mp.ImageSequenceClip(list(pose_vis),fps=fps)
+        out_video = mp.ImageSequenceClip(list(pose_vis), fps=fps)
         out_video.write_videofile(output_mp4_path, fps=fps)
         # out_video = mp.VideoClip(make_frame=lambda t:pose_vis[int(t*fps)], duration=len(pose_vis)/fps)
         # out_video.write_videofile(output_mp4_path,fps=fps)
         del pose_vis
+
+
+def render_motion_side_by_side(
+    data_left,
+    data_right,
+    output_dir,
+    fname=None,
+    fps=20,
+):
+    if fname is None:
+        fname = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) + str(
+            np.random.randint(10000, 99999)
+        )
+    output_mp4_path = os.path.join(output_dir, fname + ".mp4")
+
+    left_frames = _prepare_fast_render_frames(data_left, fps=fps)
+    right_frames = _prepare_fast_render_frames(data_right, fps=fps)
+    frame_count = min(len(left_frames), len(right_frames))
+    stacked_frames = np.concatenate(
+        [left_frames[:frame_count], right_frames[:frame_count]], axis=2
+    )
+
+    out_video = mp.ImageSequenceClip(list(stacked_frames), fps=fps)
+    out_video.write_videofile(output_mp4_path, fps=fps)
+
+    del left_frames
+    del right_frames
+    del stacked_frames

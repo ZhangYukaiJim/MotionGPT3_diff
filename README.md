@@ -155,6 +155,64 @@ On remote Linux servers without X11, the app uses headless EGL for the slow rend
 
 If `uv run` prints a `VIRTUAL_ENV` mismatch warning, it means another virtual environment is currently active. `uv` will still use this project's `.venv`, but you can run `deactivate` first to avoid the warning.
 
+### MotionFix Finetuning
+
+The repository now includes an experimental MotionFix preprocessing and paired-motion finetuning path for a two-motion difference-to-text task.
+
+Expected local MotionFix layout:
+
+```bash
+/opt/data/motionfix-dataset/
+  motionfix.pth.tar
+  splits.json
+```
+
+The preprocessing step converts MotionFix source/target motions into the same HumanML-compatible feature representation used by the pretrained MotionGPT3 VAE, and reuses the bundled HumanML normalization assets in `assets/meta/`.
+
+Build the default MotionFix cache:
+
+```bash
+uv run python scripts/preprocess_motionfix.py \
+  --motionfix-root /opt/data/motionfix-dataset
+```
+
+This writes a cache under:
+
+```bash
+/opt/data/motionfix-dataset/mgpt_humanml_cache/
+  manifests/{train,val,test}.json
+  source/*.npy
+  target/*.npy
+  summary.json
+```
+
+If `splits.json` is missing, preprocessing fails fast with a setup error instead of guessing splits.
+
+Run a MotionFix finetuning smoke test:
+
+```bash
+uv run python -m train \
+  --cfg configs/MoT_vae_stage4_motionfix_yzh.yaml \
+  --cfg_assets configs/assets_humanml3d_yzh.yaml \
+  --nodebug \
+  --batch_size 1
+```
+
+Prompt-only paired-motion generation is available without Gradio:
+
+```bash
+uv run python scripts/compare_two_motions_prompt.py \
+  --motion-a /opt/data/motionfix-dataset/mgpt_humanml_cache/source/000000.npy \
+  --motion-b /opt/data/motionfix-dataset/mgpt_humanml_cache/target/000000.npy \
+  --max-length 40
+```
+
+Notes:
+
+- The current MotionFix path is script and training oriented; it does not add a Gradio web UI workflow.
+- The paired-motion task uses `m2t_diff` and continues from `checkpoints/motiongpt3.ckpt` with guidance settings compatible with `lm.fake_latent`.
+- The first implementation uses HumanML normalization intentionally, so the pretrained HumanML VAE can be reused without changing its expected input distribution.
+
 </details>
 
 <details open>
