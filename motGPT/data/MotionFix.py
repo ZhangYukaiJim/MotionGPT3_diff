@@ -37,7 +37,7 @@ class MotionFixPairedDataset(data.Dataset):
             "input": [
                 "Describe the difference between <Motion_Placeholder_s1> and <Motion_Placeholder_s2> in detail."
             ],
-            "output": [""],
+            "output": ["<Caption_Placeholder>"],
         }
         return {
             "id": record["id"],
