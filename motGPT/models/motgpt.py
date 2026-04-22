@@ -332,8 +332,6 @@ class MotGPT(BaseModel):
 
     @torch.no_grad()
     def val_m2t_diff_forward(self, batch):
-        self.hparams.metrics_dict = []
-
         feats_source = batch["motion_source"]
         feats_target = batch["motion_target"]
         lengths_source = batch["length_source"]
@@ -767,6 +765,11 @@ class MotGPT(BaseModel):
                             word_embs=batch["word_embs"],
                             pos_ohot=batch["pos_ohot"],
                             text_lengths=batch["text_len"],
+                        )
+                    elif metric == "M2TDiffMetrics":
+                        getattr(self.metrics, metric).update(
+                            pred_texts=rs_set["t_pred"],
+                            gt_texts=rs_set["t_ref"],
                         )
 
         # return forward output rather than loss during test

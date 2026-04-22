@@ -4,6 +4,7 @@ from .mr import MRMetrics
 from .t2m import TM2TMetrics
 from .mm import MMMetrics
 from .m2t import M2TMetrics
+from .m2t_diff import M2TDiffMetrics
 from .m2m import PredMetrics
 from .tmr import TMRMetrics
 
@@ -16,9 +17,14 @@ class BaseMetrics(nn.Module):
         # cfg.METRIC.TM2T.t2m_textencoder.params['dataset'] = datamodule.name
 
         data_name = datamodule.name
-        print('in BaseMetrics, data_name:', data_name)
-        if data_name in ["humanml3d", "kit", 'motionx', 'tomato']:
-            if 'TM2TMetrics' in cfg.METRIC.TYPE:
+        print("in BaseMetrics, data_name:", data_name)
+        if "M2TDiffMetrics" in cfg.METRIC.TYPE:
+            self.M2TDiffMetrics = M2TDiffMetrics(
+                cfg=cfg,
+                dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
+            )
+        if data_name in ["humanml3d", "kit", "motionx", "tomato"]:
+            if "TM2TMetrics" in cfg.METRIC.TYPE:
                 self.TM2TMetrics = TM2TMetrics(
                     cfg=cfg,
                     dataname=data_name,
@@ -26,13 +32,14 @@ class BaseMetrics(nn.Module):
                     dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
                     njoints=njoints,
                 )
-            if 'M2TMetrics' in cfg.METRIC.TYPE or cfg.model.params.task =='m2t':
+            if "M2TMetrics" in cfg.METRIC.TYPE or cfg.model.params.task == "m2t":
                 self.M2TMetrics = M2TMetrics(
                     cfg=cfg,
                     dataname=data_name,
                     w_vectorizer=datamodule.hparams.w_vectorizer,
                     diversity_times=30 if debug else cfg.METRIC.DIVERSITY_TIMES,
-                    dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP)
+                    dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
+                )
             self.MMMetrics = MMMetrics(
                 cfg=cfg,
                 dataname=data_name,
@@ -40,29 +47,30 @@ class BaseMetrics(nn.Module):
                 dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
                 njoints=njoints,
             )
-            if 'TemosMetric' in cfg.METRIC.TYPE:
+            if "TemosMetric" in cfg.METRIC.TYPE:
                 from .compute import ComputeMetrics
+
                 self.TemosMetric = ComputeMetrics(
                     njoints=njoints,
                     jointstype=cfg.DATASET.JOINT_TYPE,
                     dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
                 )
-            if 'TMRMetrics' in cfg.METRIC.TYPE:
+            if "TMRMetrics" in cfg.METRIC.TYPE:
                 self.TMRMetrics = TMRMetrics(
                     cfg=cfg,
                     dataname=data_name,
                     diversity_times=30 if debug else cfg.METRIC.DIVERSITY_TIMES,
                     dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
-                    threshold_selfsim_metrics=0.95
+                    threshold_selfsim_metrics=0.95,
                 )
 
-        if 'MRMetrics' in cfg.METRIC.TYPE:
+        if "MRMetrics" in cfg.METRIC.TYPE:
             self.MRMetrics = MRMetrics(
                 njoints=njoints,
                 jointstype=cfg.DATASET.JOINT_TYPE,
                 dist_sync_on_step=cfg.METRIC.DIST_SYNC_ON_STEP,
             )
-        if 'PredMetrics' in cfg.METRIC.TYPE:
+        if "PredMetrics" in cfg.METRIC.TYPE:
             self.PredMetrics = PredMetrics(
                 cfg=cfg,
                 njoints=njoints,

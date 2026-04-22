@@ -212,6 +212,10 @@ Notes:
 - The current MotionFix path is script and training oriented; it does not add a Gradio web UI workflow.
 - The paired-motion task uses `m2t_diff` and continues from `checkpoints/motiongpt3.ckpt` with guidance settings compatible with `lm.fake_latent`.
 - The first implementation uses HumanML normalization intentionally, so the pretrained HumanML VAE can be reused without changing its expected input distribution.
+- Recommended `m2t_diff` evaluation uses `METRIC.TYPE: [M2TDiffMetrics]`, which reports `Bert_F1`, `ROUGE_L`, `CIDEr`, `Bleu_1`, `Bleu_4`, `Empty_output_rate`, and `Avg_generated_length`.
+- `Bert_F1` now uses `torchmetrics.text.BERTScore`; current validated MotionFix configs should keep `METRIC.M2T_DIFF.BERT_DEVICE: cpu` because the upstream TorchMetrics GPU path with `idf=True` hits a device mismatch in this environment.
+- `Matching_score` and `R_precision_top_k` remain excluded from `m2t_diff` because they assume a single motion-text pairing rather than a caption about the relation between two motions.
+- Pair-aware motion-text retrieval is still future work; the first rollout only ships text-generation metrics plus decoding diagnostics.
 
 </details>
 

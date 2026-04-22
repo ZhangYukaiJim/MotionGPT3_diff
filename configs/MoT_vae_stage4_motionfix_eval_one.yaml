@@ -1,10 +1,10 @@
-NAME: MoT_vae_stage4_motionfix_overfit1batch
+NAME: MoT_vae_stage4_motionfix_eval_one
 ACCELERATOR: 'gpu'
 NUM_NODES: 1
-DEVICE: [0, 1]
-DEBUG: False
+DEVICE: [0]
+DEBUG: false
 FULL_CONFIG: true
-VIS_NUM: 8
+VIS_NUM: 0
 
 lm_ablation:
   motion_holder_repeat: 4
@@ -29,10 +29,9 @@ ABLATION:
 
 TRAIN:
   STAGE: lm_finetune
-  SPLIT: train
   instruction_type: witht2t
-  NUM_WORKERS: 8
-  BATCH_SIZE: 16
+  NUM_WORKERS: 0
+  BATCH_SIZE: 1
   END_EPOCH: 300
   PRETRAINED: checkpoints/motiongpt3.ckpt
   PRETRAINED_VAE: checkpoints/1222_mld_humanml3d_FID041.ckpt
@@ -55,21 +54,22 @@ TRAIN:
       weight_decay: 0.0
 
 EVAL:
-  BATCH_SIZE: 2
+  BATCH_SIZE: 1
   NUM_WORKERS: 0
   SPLIT: val
 
 TEST:
-  CHECKPOINTS: experiments/motgpt/MoT_vae_stage4_motionfix_overfit1batch/checkpoints/last.ckpt
+  CHECKPOINTS: checkpoints/motiongpt3.ckpt
   SPLIT: test
-  BATCH_SIZE: 2
+  BATCH_SIZE: 1
   NUM_WORKERS: 0
   REPLICATION_TIMES: 1
+  SAVE_PREDICTIONS: false
 
 DATASET:
   target: motGPT.data.MotionFix.MotionFixDataModule
   CODE_PATH: TOKENS
-  MOTIONFIX_CACHE_ROOT: /opt/data/motionfix-dataset/mgpt_humanml_cache_overfit
+  MOTIONFIX_CACHE_ROOT: /home/yzhanghe/MotionGPT3/cache/motionfix_eval_one
   TASK_ROOT: deps/mGPT_instructions
   TASK_PATH: ''
   NFEATS: 263
@@ -87,6 +87,9 @@ DATASET:
 
 METRIC:
   TYPE: [M2TDiffMetrics]
+  M2T_DIFF:
+    INCLUDE_BERT_F1: false
+    INCLUDE_BLEU: true
 
 LOSS:
   LAMBDA_FEATURE: 1.0
@@ -115,13 +118,11 @@ LOGGER:
   VAL_EVERY_STEPS: 1
   WANDB:
     params:
-      tags: ['motionfix', 'stage4', 'm2t-diff', 'overfit1batch']
+      tags: ['motionfix', 'stage4', 'm2t-diff', 'eval-one']
       project: motiongpt3
 
 TRAINER:
   num_sanity_val_steps: 0
-  limit_train_batches: 1
-  limit_val_batches: 1
   enable_checkpointing: false
   log_every_n_steps: 1
 

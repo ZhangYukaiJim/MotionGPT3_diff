@@ -41,6 +41,8 @@ def getCheckpointCallback(cfg, logger=None, **kwargs):
         "gt_FID": "Metrics/gt_FID",
         "Diversity": "Metrics/Diversity",
         "MM dist": "Metrics/Matching_score",
+        "Bert F1": "Metrics/Bert_F1",
+        "Empty rate": "Metrics/Empty_output_rate",
         "Accuracy": "Metrics/accuracy",
     }
     callbacks.append(
@@ -78,6 +80,10 @@ def getCheckpointCallback(cfg, logger=None, **kwargs):
         "M2TMetrics": {
             "Metrics/Matching_score": {"abbr": "MMDist", "mode": "min"},
             "Metrics/R_precision_top_3": {"abbr": "R3", "mode": "max"},
+        },
+        "M2TDiffMetrics": {
+            "Metrics/Bert_F1": {"abbr": "BertF1", "mode": "max"},
+            "Metrics/Empty_output_rate": {"abbr": "Empty", "mode": "min"},
         },
         "TM2TMetrics": {
             "Metrics/FID": {"abbr": "FID", "mode": "min"},

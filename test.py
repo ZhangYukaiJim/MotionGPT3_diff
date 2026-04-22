@@ -14,6 +14,7 @@ from motGPT.models.build_model import build_model
 from motGPT.utils.logger import create_logger
 from motGPT.utils.load_checkpoint import load_pretrained, load_pretrained_vae
 
+
 def print_table(title, metrics, logger=None):
     table = Table(title=title)
 
@@ -46,13 +47,13 @@ def main():
     logger.info(OmegaConf.to_yaml(cfg))
 
     # Output dir
-    model_name = cfg.model.target.split('.')[-2].lower()
+    model_name = cfg.model.target.split(".")[-2].lower()
     output_dir = Path(
-        os.path.join(cfg.FOLDER, model_name, cfg.NAME, "samples_" + cfg.TIME))
+        os.path.join(cfg.FOLDER, model_name, cfg.NAME, "samples_" + cfg.TIME)
+    )
     if cfg.TEST.SAVE_PREDICTIONS:
         output_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Saving predictions to {str(output_dir)}")
-
 
     # Environment Variables
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -63,8 +64,11 @@ def main():
 
     # Dataset
     datamodule = build_data(cfg)
-    logger.info("datasets module {} initialized".format("".join(
-        cfg.DATASET.target.split('.')[-2])))
+    logger.info(
+        "datasets module {} initialized".format(
+            "".join(cfg.DATASET.target.split(".")[-2])
+        )
+    )
 
     # Model
     model = build_model(cfg, datamodule)
@@ -75,7 +79,7 @@ def main():
         benchmark=False,
         max_epochs=cfg.TRAIN.END_EPOCH,
         accelerator=cfg.ACCELERATOR,
-        devices=list(range(len(cfg.DEVICE))),
+        devices=cfg.DEVICE,
         default_root_dir=cfg.FOLDER_EXP,
         reload_dataloaders_every_n_epochs=1,
         deterministic=False,
@@ -105,7 +109,11 @@ def main():
         metrics_type = ", ".join(cfg.METRIC.TYPE)
         logger.info(f"Evaluating {metrics_type} - Replication {i}")
         metrics = trainer.test(model, datamodule=datamodule)[0]
-        if "TM2TMetrics" in metrics_type and cfg.model.params.task == "t2m" and cfg.model.params.stage != 'vae':
+        if (
+            "TM2TMetrics" in metrics_type
+            and cfg.model.params.task == "t2m"
+            and cfg.model.params.stage != "vae"
+        ):
             # mm meteics
             logger.info(f"Evaluating MultiModality - Replication {i}")
             datamodule.mm_mode(True)
@@ -119,12 +127,16 @@ def main():
             else:
                 all_metrics[key] += [item]
 
-    all_metrics_new = {'epoch': model.epoch, 'task': model.hparams.task, 'split':model.datamodule.cfg.TEST.SPLIT}
+    all_metrics_new = {
+        "epoch": model.epoch,
+        "task": model.hparams.task,
+        "split": model.datamodule.cfg.TEST.SPLIT,
+    }
 
     for key, item in all_metrics.items():
-        if ('epoch' in key) or key in ['task']: continue
-        mean, conf_interval = get_metric_statistics(np.array(item),
-                                                    replication_times)
+        if ("epoch" in key) or key in ["task"]:
+            continue
+        mean, conf_interval = get_metric_statistics(np.array(item), replication_times)
         all_metrics_new[key + "/mean"] = mean
         all_metrics_new[key + "/conf_interval"] = conf_interval
 
@@ -132,7 +144,10 @@ def main():
     all_metrics_new.update(all_metrics)
 
     # Save metrics to file
-    metric_file = output_dir.parent / f"metrics_{model.hparams.task}_{model.epoch}_{all_metrics_new['split']}_{cfg.TIME}.json"
+    metric_file = (
+        output_dir.parent
+        / f"metrics_{model.hparams.task}_{model.epoch}_{all_metrics_new['split']}_{cfg.TIME}.json"
+    )
     with open(metric_file, "w", encoding="utf-8") as f:
         json.dump(all_metrics_new, f, indent=4)
     logger.info(f"Testing done, the metrics are saved to {str(metric_file)}")

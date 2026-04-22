@@ -65,7 +65,11 @@ DATASET:
   CODE_PATH: TOKENS
 
 METRIC:
-  TYPE: []
+  TYPE: [M2TDiffMetrics]
+  M2T_DIFF:
+    INCLUDE_BERT_F1: true
+    INCLUDE_BLEU: true
+    BERT_DEVICE: cpu
 
 LOSS:
   LAMBDA_FEATURE: 1.0
