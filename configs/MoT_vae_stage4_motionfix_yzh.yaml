@@ -70,6 +70,7 @@ METRIC:
     INCLUDE_BERT_F1: true
     INCLUDE_BLEU: true
     BERT_DEVICE: cpu
+    BERT_IDF: true
 
 LOSS:
   LAMBDA_FEATURE: 1.0
