@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from torchmetrics.functional.text import bert as torchmetrics_bert
 from torchmetrics.text import bert as torchmetrics_text_bert
@@ -100,16 +102,20 @@ class FixedDeviceBERTScore(BERTScore):
                 f"Please use num_layers <= {model.config.num_hidden_layers}"
             )
 
-        baseline = (
-            torchmetrics_bert._load_baseline(
-                self.lang,
-                self.model_name_or_path,
-                self.baseline_path,
-                self.baseline_url,
-            )
-            if self.rescale_with_baseline
-            else None
-        )
+        baseline = None
+        if self.rescale_with_baseline:
+            try:
+                baseline = torchmetrics_bert._load_baseline(
+                    self.lang,
+                    self.model_name_or_path,
+                    self.baseline_path,
+                    self.baseline_url,
+                )
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Falling back to unscaled BERTScore because baseline loading failed: %s",
+                    exc,
+                )
 
         target_dataset = torchmetrics_bert.TokenizedDataset(**target, idf=self.idf)
         preds_dataset = torchmetrics_bert.TokenizedDataset(

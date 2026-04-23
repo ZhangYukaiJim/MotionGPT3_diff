@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from typing import Iterable, List
 
 import torch
+import torch.distributed as dist
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from rouge_score import rouge_scorer
 from torchmetrics import Metric
@@ -53,6 +54,56 @@ class M2TDiffMetrics(Metric):
                 rescale_with_baseline=True,
                 verbose=False,
             )
+            # We gather text inputs explicitly across ranks before compute.
+            self.bert_metric._to_sync = False
+
+    def _is_distributed(self) -> bool:
+        return dist.is_available() and dist.is_initialized()
+
+    def _gather_text_lists(self, values):
+        if not self._is_distributed():
+            return values
+
+        gathered_values = [None] * dist.get_world_size()
+        dist.all_gather_object(gathered_values, values)
+
+        merged_values = []
+        for rank_values in gathered_values:
+            merged_values.extend(rank_values)
+        return merged_values
+
+    def _compute_metric_values(
+        self, predictions: List[str], references: List[List[str]]
+    ):
+        values = {}
+        values["ROUGE_L"] = self._compute_rouge_l(predictions, references)
+        values["CIDEr"] = self._compute_cider(predictions, references)
+
+        if self.include_bleu:
+            values["Bleu_1"] = self._compute_bleu(predictions, references, max_order=1)
+            values["Bleu_4"] = self._compute_bleu(predictions, references, max_order=4)
+
+        if self.include_bert_f1:
+            bert_device = self.bert_device or "cpu"
+            logging.getLogger(__name__).info(
+                "M2TDiffMetrics: starting Bert_F1 on device=%s idf=%s for %s predictions",
+                bert_device,
+                self.bert_idf,
+                len(predictions),
+            )
+            values["Bert_F1"] = self._compute_best_bert_f1(predictions, references)
+            logging.getLogger(__name__).info("M2TDiffMetrics: finished Bert_F1")
+
+        prediction_count = max(len(predictions), 1)
+        values["Empty_output_rate"] = (
+            sum(prediction == "" for prediction in predictions) / prediction_count
+        )
+        values["Avg_generated_length"] = (
+            sum(len(prediction.split()) for prediction in predictions)
+            / prediction_count
+        )
+
+        return values
 
     def _normalize_prediction(self, prediction: str) -> str:
         if prediction is None:
@@ -230,43 +281,16 @@ class M2TDiffMetrics(Metric):
         device = self.num_predictions.device
         metrics = {metric: torch.tensor(0.0, device=device) for metric in self.metrics}
 
-        if sanity_flag or self.num_predictions.item() == 0:
+        pred_texts = self._gather_text_lists(self.pred_texts)
+        gt_texts = self._gather_text_lists(self.gt_texts)
+
+        if sanity_flag or len(pred_texts) == 0:
             self.reset()
             return metrics
 
-        metrics["ROUGE_L"] = torch.tensor(
-            self._compute_rouge_l(self.pred_texts, self.gt_texts), device=device
-        )
-        metrics["CIDEr"] = torch.tensor(
-            self._compute_cider(self.pred_texts, self.gt_texts), device=device
-        )
-        if self.include_bleu:
-            metrics["Bleu_1"] = torch.tensor(
-                self._compute_bleu(self.pred_texts, self.gt_texts, max_order=1),
-                device=device,
-            )
-            metrics["Bleu_4"] = torch.tensor(
-                self._compute_bleu(self.pred_texts, self.gt_texts, max_order=4),
-                device=device,
-            )
-
-        if self.include_bert_f1:
-            bert_device = self.bert_device or str(device)
-            logging.getLogger(__name__).info(
-                "M2TDiffMetrics: starting Bert_F1 on device=%s idf=%s for %s predictions",
-                bert_device,
-                self.bert_idf,
-                len(self.pred_texts),
-            )
-            metrics["Bert_F1"] = torch.tensor(
-                self._compute_best_bert_f1(self.pred_texts, self.gt_texts),
-                device=device,
-            )
-            logging.getLogger(__name__).info("M2TDiffMetrics: finished Bert_F1")
-
-        count = self.num_predictions.float().clamp_min(1.0)
-        metrics["Empty_output_rate"] = self.empty_predictions.float() / count
-        metrics["Avg_generated_length"] = self.total_generated_length / count
+        metric_values = self._compute_metric_values(pred_texts, gt_texts)
+        for metric_name, metric_value in metric_values.items():
+            metrics[metric_name] = torch.tensor(metric_value, device=device)
 
         self.reset()
         return metrics

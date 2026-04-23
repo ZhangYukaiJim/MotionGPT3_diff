@@ -11,12 +11,12 @@ def get_module_config(cfg, filepath="./configs"):
     Load yaml config files from subfolders
     """
 
-    yamls = glob.glob(pjoin(filepath, '*', '*.yaml'))
-    yamls = [y.replace(filepath, '') for y in yamls]
+    yamls = glob.glob(pjoin(filepath, "*", "*.yaml"))
+    yamls = [y.replace(filepath, "") for y in yamls]
     for yaml in yamls:
-        nodes = yaml.replace('.yaml', '').replace(os.sep, '.')
-        nodes = nodes[1:] if nodes[0] == '.' else nodes
-        OmegaConf.update(cfg, nodes, OmegaConf.load('./configs' + yaml))
+        nodes = yaml.replace(".yaml", "").replace(os.sep, ".")
+        nodes = nodes[1:] if nodes[0] == "." else nodes
+        OmegaConf.update(cfg, nodes, OmegaConf.load("./configs" + yaml))
 
     return cfg
 
@@ -46,20 +46,45 @@ def resume_config(cfg: OmegaConf):
     """
     Resume model and wandb
     """
-    
+
     if cfg.TRAIN.RESUME:
         resume = cfg.TRAIN.RESUME
         if os.path.exists(resume):
-            # Checkpoints
-            cfg.TRAIN.PRETRAINED = pjoin(resume, "checkpoints", "last.ckpt")
-            # Wandb
-            wandb_files = os.listdir(pjoin(resume, "wandb", "latest-run"))
-            wandb_run = [item for item in wandb_files if "run-" in item][0]
-            cfg.LOGGER.WANDB.params.id = wandb_run.replace("run-","").replace(".wandb", "")
+            resume_ckpt = resume
+            if os.path.isdir(resume):
+                resume_ckpt = pjoin(resume, "checkpoints", "last.ckpt")
+
+            if not os.path.exists(resume_ckpt):
+                raise ValueError("Resume checkpoint path is not right.")
+
+            cfg.TRAIN.RESUME = resume_ckpt
+
+            resume_dir = os.path.dirname(os.path.dirname(resume_ckpt))
+            wandb_root = pjoin(resume_dir, "wandb")
+            latest_run_dir = pjoin(wandb_root, "latest-run")
+
+            if os.path.isdir(latest_run_dir):
+                wandb_files = os.listdir(latest_run_dir)
+                wandb_run = [item for item in wandb_files if "run-" in item]
+                if wandb_run:
+                    cfg.LOGGER.WANDB.params.id = (
+                        wandb_run[0].replace("run-", "").replace(".wandb", "")
+                    )
+            elif os.path.isdir(wandb_root):
+                offline_runs = sorted(
+                    [
+                        item
+                        for item in os.listdir(wandb_root)
+                        if item.startswith("offline-run-")
+                    ]
+                )
+                if offline_runs:
+                    cfg.LOGGER.WANDB.params.id = offline_runs[-1].split("-")[-1]
         else:
             raise ValueError("Resume path is not right.")
 
     return cfg
+
 
 def parse_args(phase="train"):
     """
@@ -85,7 +110,7 @@ def parse_args(phase="train"):
         cfg_defualt = "./configs/render.yaml"
     elif phase == "webui":
         cfg_defualt = "./configs/webui.yaml"
-        
+
     group.add_argument(
         "--cfg",
         type=str,
@@ -96,39 +121,39 @@ def parse_args(phase="train"):
 
     # Parse for each phase
     if phase in ["train", "test"]:
-        group.add_argument("--batch_size",
-                           type=int,
-                           required=False,
-                           help="training batch size")
-        group.add_argument("--accumulate_grad_batches",
-                           type=int,
-                           required=False,
-                           default=None,
-                           help="accumulate batch")
-        group.add_argument("--num_nodes",
-                           type=int,
-                           required=False,
-                           help="number of nodes")
-        group.add_argument("--device",
-                           type=int,
-                           nargs="+",
-                           required=False,
-                           help="training device")
-        group.add_argument("--task",
-                           type=str,
-                           required=False,
-                           help="evaluation task type")
-        group.add_argument("--nodebug",
-                           action="store_true",
-                           required=False,
-                           help="debug or not")
-
+        group.add_argument(
+            "--batch_size", type=int, required=False, help="training batch size"
+        )
+        group.add_argument(
+            "--accumulate_grad_batches",
+            type=int,
+            required=False,
+            default=None,
+            help="accumulate batch",
+        )
+        group.add_argument(
+            "--num_nodes", type=int, required=False, help="number of nodes"
+        )
+        group.add_argument(
+            "--device", type=int, nargs="+", required=False, help="training device"
+        )
+        group.add_argument(
+            "--task", type=str, required=False, help="evaluation task type"
+        )
+        group.add_argument(
+            "--nodebug", action="store_true", required=False, help="debug or not"
+        )
+        group.add_argument(
+            "--wandb",
+            choices=["on", "off", "offline"],
+            required=False,
+            help="override WandB logging mode",
+        )
 
     if phase == "demo":
-        group.add_argument("--task",
-            type=str,
-            required=False,
-            help="evaluation task type")
+        group.add_argument(
+            "--task", type=str, required=False, help="evaluation task type"
+        )
         group.add_argument(
             "--example",
             type=str,
@@ -143,21 +168,15 @@ def parse_args(phase="train"):
         )
 
     if phase == "render":
-        group.add_argument("--npy",
-                           type=str,
-                           required=False,
-                           default=None,
-                           help="npy motion files")
-        group.add_argument("--dir",
-                           type=str,
-                           required=False,
-                           default=None,
-                           help="npy motion folder")
-        group.add_argument("--fps",
-                    type=int,
-                    required=False,
-                    default=30,
-                    help="render fps")
+        group.add_argument(
+            "--npy", type=str, required=False, default=None, help="npy motion files"
+        )
+        group.add_argument(
+            "--dir", type=str, required=False, default=None, help="npy motion folder"
+        )
+        group.add_argument(
+            "--fps", type=int, required=False, default=30, help="render fps"
+        )
         group.add_argument(
             "--mode",
             type=str,
@@ -167,11 +186,14 @@ def parse_args(phase="train"):
         )
 
     params = parser.parse_args()
-    
+    wandb_override = (
+        getattr(params, "wandb", None) if phase in ["train", "test"] else None
+    )
+
     # Load yaml config files
     OmegaConf.register_new_resolver("eval", eval)
     cfg_assets = OmegaConf.load(params.cfg_assets)
-    cfg_base = OmegaConf.load(pjoin(cfg_assets.CONFIG_FOLDER, 'default.yaml'))
+    cfg_base = OmegaConf.load(pjoin(cfg_assets.CONFIG_FOLDER, "default.yaml"))
     cfg_exp = OmegaConf.merge(cfg_base, OmegaConf.load(params.cfg))
     if not cfg_exp.FULL_CONFIG:
         cfg_exp = get_module_config(cfg_exp, cfg_assets.CONFIG_FOLDER)
@@ -180,12 +202,18 @@ def parse_args(phase="train"):
 
     # Update config with arguments
     if phase in ["train", "test"]:
-        cfg.TRAIN.BATCH_SIZE = params.batch_size if params.batch_size else cfg.TRAIN.BATCH_SIZE
+        cfg.TRAIN.BATCH_SIZE = (
+            params.batch_size if params.batch_size else cfg.TRAIN.BATCH_SIZE
+        )
         cfg.DEVICE = params.device if params.device else cfg.DEVICE
         cfg.NUM_NODES = params.num_nodes if params.num_nodes else cfg.NUM_NODES
         cfg.model.params.task = params.task if params.task else cfg.model.params.task
         cfg.DEBUG = not params.nodebug if params.nodebug is not None else cfg.DEBUG
-        cfg.TRAIN.accumulate_grad_batches = params.accumulate_grad_batches if params.accumulate_grad_batches else cfg.TRAIN.accumulate_grad_batches
+        cfg.TRAIN.accumulate_grad_batches = (
+            params.accumulate_grad_batches
+            if params.accumulate_grad_batches
+            else cfg.TRAIN.accumulate_grad_batches
+        )
 
         # Force no debug in test
         if phase == "test":
@@ -213,9 +241,20 @@ def parse_args(phase="train"):
     # Debug mode
     if cfg.DEBUG:
         cfg.NAME = "debug--" + cfg.NAME
-        cfg.LOGGER.WANDB.params.offline = True
         cfg.LOGGER.VAL_EVERY_STEPS = 1
-        
+
+        if cfg.LOGGER.ENABLE_WANDB:
+            cfg.LOGGER.WANDB.params.offline = True
+
+    if wandb_override == "on":
+        cfg.LOGGER.ENABLE_WANDB = True
+        cfg.LOGGER.WANDB.params.offline = False
+    elif wandb_override == "off":
+        cfg.LOGGER.ENABLE_WANDB = False
+    elif wandb_override == "offline":
+        cfg.LOGGER.ENABLE_WANDB = True
+        cfg.LOGGER.WANDB.params.offline = True
+
     # Resume config
     cfg = resume_config(cfg)
 

@@ -25,12 +25,11 @@ def main():
 
     # Metric Logger
     pl_loggers = []
-    for loggerName in cfg.LOGGER.TYPE:
-        if loggerName == "tenosrboard" or cfg.LOGGER.WANDB.params.project:
-            pl_logger = instantiate_from_config(
-                eval(f"cfg.LOGGER.{loggerName.upper()}")
-            )
-            pl_loggers.append(pl_logger)
+    logger_names = list(getattr(cfg.LOGGER, "TYPE", []))
+    if cfg.LOGGER.ENABLE_TENSORBOARD and "tensorboard" in logger_names:
+        pl_loggers.append(instantiate_from_config(cfg.LOGGER.TENSORBOARD))
+    if cfg.LOGGER.ENABLE_WANDB and "wandb" in logger_names:
+        pl_loggers.append(instantiate_from_config(cfg.LOGGER.WANDB))
 
     # Callbacks
     callbacks = build_callbacks(cfg, logger=logger, phase="train")
@@ -76,12 +75,12 @@ def main():
     logger.info("Trainer initialized")
 
     # Strict load pretrianed model
-    if cfg.TRAIN.PRETRAINED:
+    if cfg.TRAIN.PRETRAINED and not cfg.TRAIN.RESUME:
         load_pretrained(cfg, model, logger)
     # model.lm.resize_tokenizer()
 
     # Strict load vae model
-    if cfg.TRAIN.PRETRAINED_VAE:
+    if cfg.TRAIN.PRETRAINED_VAE and not cfg.TRAIN.RESUME:
         load_pretrained_vae(cfg, model, logger)
 
     # Pytorch 2.0 Compile
@@ -91,7 +90,7 @@ def main():
 
     # Lightning Fitting
     if cfg.TRAIN.RESUME:
-        trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.TRAIN.PRETRAINED)
+        trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.TRAIN.RESUME)
     else:
         trainer.fit(model, datamodule=datamodule)
 

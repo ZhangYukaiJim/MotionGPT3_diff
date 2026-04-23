@@ -90,6 +90,8 @@ class MotGPT(BaseModel):
                 p.requires_grad = False
         self.model_dir = cfg.FOLDER_EXP
         self.vis_num = getattr(cfg, "VIS_NUM", 2)
+        val_vis_ids = getattr(cfg, "VAL_VIS_IDS", None)
+        self.val_vis_ids = {str(item) for item in val_vis_ids} if val_vis_ids else None
 
         self.guidance_scale = guidance_scale
         self.do_classifier_free_guidance = self.guidance_scale > 1.0
@@ -171,6 +173,20 @@ class MotGPT(BaseModel):
             assert False, f"{task} Not implemented yet"
 
         return outputs
+
+    def _get_val_vis_indices(self, batch, batch_size):
+        if self.vis_num <= 0 or batch_size <= 0:
+            return []
+
+        if self.val_vis_ids:
+            selected_indices = []
+            for idx, fname in enumerate(batch["fname"]):
+                keyid = str(fname).split("/")[-1]
+                if keyid in self.val_vis_ids:
+                    selected_indices.append(idx)
+            return selected_indices[: self.vis_num]
+
+        return list(range(min(batch_size, self.vis_num)))
 
     def train_lm_forward(self, batch):
         texts = batch["text"]
@@ -525,11 +541,8 @@ class MotGPT(BaseModel):
                     lengths = batch["length"]
                     feats_ref, joints_ref = rs_set["m_ref"], rs_set["joints_ref"]
                     feats_rst, joints_rst = rs_set["m_rst"], rs_set["joints_rst"]
-                    rand_save_idx = random.sample(
-                        range(feats_ref.shape[0]), min(feats_ref.shape[0], self.vis_num)
-                    )
-                    for idd in rand_save_idx:
-                        idx = idd % len(lengths)
+                    save_indices = self._get_val_vis_indices(batch, feats_ref.shape[0])
+                    for idx in save_indices:
                         output_dir = os.path.join(
                             self.model_dir,
                             "validate_motion",
@@ -670,11 +683,9 @@ class MotGPT(BaseModel):
                     feats_ref = rs_set["m_ref"]
                     gen_texts = rs_set["t_pred"]
 
-                    rand_save_idx = random.sample(
-                        range(feats_ref.shape[0]), min(feats_ref.shape[0], self.vis_num)
-                    )
+                    save_indices = self._get_val_vis_indices(batch, feats_ref.shape[0])
                     lengths = rs_set["length"]
-                    for idx in rand_save_idx:
+                    for idx in save_indices:
                         output_dir = os.path.join(
                             self.model_dir,
                             "validate_motion",

@@ -198,6 +198,23 @@ uv run python -m train \
   --batch_size 1
 ```
 
+Resume a previous MotionFix finetuning run:
+
+```bash
+uv run python -m train \
+  --cfg configs/MoT_vae_stage4_motionfix_yzh.yaml \
+  --cfg_assets configs/assets_humanml3d_yzh.yaml \
+  --nodebug \
+  --wandb on
+```
+
+Then set `TRAIN.RESUME` in the config to either the experiment directory or a checkpoint path, for example:
+
+```yaml
+TRAIN:
+  RESUME: experiments/motgpt/debug--MoT_vae_stage4_motionfix_yzh
+```
+
 Prompt-only paired-motion generation is available without Gradio:
 
 ```bash
@@ -212,10 +229,18 @@ Notes:
 - The current MotionFix path is script and training oriented; it does not add a Gradio web UI workflow.
 - The paired-motion task uses `m2t_diff` and continues from `checkpoints/motiongpt3.ckpt` with guidance settings compatible with `lm.fake_latent`.
 - The first implementation uses HumanML normalization intentionally, so the pretrained HumanML VAE can be reused without changing its expected input distribution.
+- Validation visualizations now default to the first `VIS_NUM` items from the first validation batch. Set `VAL_VIS_IDS` in config to a list of dataset ids if you want a fixed curated subset instead.
 - Recommended `m2t_diff` evaluation uses `METRIC.TYPE: [M2TDiffMetrics]`, which reports `Bert_F1`, `ROUGE_L`, `CIDEr`, `Bleu_1`, `Bleu_4`, `Empty_output_rate`, and `Avg_generated_length`.
+- These `Metrics/*` values are logged through Lightning and will appear in TensorBoard and WandB when those loggers are enabled.
 - `Bert_F1` uses a TorchMetrics-based BERTScore path with local device-placement fixes for MotionFix evaluation. Validated configs can use `METRIC.M2T_DIFF.BERT_DEVICE: cpu` or `cuda:0`; `METRIC.M2T_DIFF.BERT_IDF` defaults to `true` and remains configurable alongside `INCLUDE_BERT_F1` and `INCLUDE_BLEU`.
 - `Matching_score` and `R_precision_top_k` remain excluded from `m2t_diff` because they assume a single motion-text pairing rather than a caption about the relation between two motions.
 - Pair-aware motion-text retrieval is still future work; the first rollout only ships text-generation metrics plus decoding diagnostics.
+
+Logger controls:
+
+- `DEBUG: true` now mainly changes the run name prefix and validation cadence; it does not disable metrics.
+- `LOGGER.ENABLE_TENSORBOARD` and `LOGGER.ENABLE_WANDB` control whether each logger is attached.
+- `--wandb on|off|offline` can override WandB mode from the CLI.
 
 </details>
 

@@ -1,6 +1,8 @@
 SEED_VALUE: 1234 # Seed value
 DEBUG: True # Debug mode
 FULL_CONFIG: false
+VIS_NUM: 2
+VAL_VIS_IDS: null
 
 TRAIN:
   SPLIT: 'train' # Training split name
@@ -178,8 +180,10 @@ DEMO:
   TASK: t2m
 
 LOGGER:
+  TYPE: ['tensorboard', 'wandb']
   VAL_EVERY_STEPS: 10
-  LOGGERS: ['tensorboard', 'wandb']
+  ENABLE_TENSORBOARD: True
+  ENABLE_WANDB: True
   TENSORBOARD:
     target: pytorch_lightning.loggers.TensorBoardLogger
     params:

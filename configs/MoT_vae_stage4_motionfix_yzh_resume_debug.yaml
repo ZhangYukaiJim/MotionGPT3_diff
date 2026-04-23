@@ -3,6 +3,15 @@ ACCELERATOR: 'gpu'
 NUM_NODES: 1
 DEVICE: [0,1]
 VIS_NUM: 8
+VAL_VIS_IDS:
+  - '000283'
+  - '000476'
+  - '000571'
+  - '000708'
+  - '000727'
+  - '000750'
+  - '000755'
+  - '000872'
 
 lm_ablation:
   motion_holder_repeat: 4
@@ -31,6 +40,7 @@ TRAIN:
   NUM_WORKERS: 8
   BATCH_SIZE: 16
   END_EPOCH: 300
+  RESUME: experiments/motgpt/debug--MoT_vae_stage4_motionfix_yzh
   PRETRAINED: checkpoints/motiongpt3.ckpt
   PRETRAINED_VAE: checkpoints/1222_mld_humanml3d_FID041.ckpt
 
@@ -56,7 +66,7 @@ EVAL:
   SPLIT: val
 
 TEST:
-  CHECKPOINTS: experiments/motgpt/MoT_vae_stage4_motionfix_yzh/checkpoints/last.ckpt
+  CHECKPOINTS: experiments/motgpt/debug--MoT_vae_stage4_motionfix_yzh/checkpoints/last.ckpt
   SPLIT: test
   BATCH_SIZE: 16
   REPLICATION_TIMES: 1
@@ -102,5 +112,5 @@ LOGGER:
   VAL_EVERY_STEPS: 10
   WANDB:
     params:
-      tags: ['motionfix', 'stage4', 'm2t-diff']
+      tags: ['motionfix', 'stage4', 'm2t-diff', 'resume']
       project: motiongpt3
