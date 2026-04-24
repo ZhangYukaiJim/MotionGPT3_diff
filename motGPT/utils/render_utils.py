@@ -13,6 +13,11 @@ from motGPT.render.pyrender.smpl_render import SMPLRender
 
 SMPL_MODEL_PATH = "deps/smpl_models/smpl"
 STATIC_RENDER_CACHE_VERSION = "v1"
+M2T_DIFF_SINGLE_RENDER_TASK = "m2t_diff_single"
+M2T_DIFF_SIDE_BY_SIDE_RENDER_TASK = "m2t_diff_side_by_side"
+M2T_DIFF_SOURCE_SUFFIX = "source"
+M2T_DIFF_TARGET_SUFFIX = "target"
+M2T_DIFF_SIDE_BY_SIDE_SUFFIX = "source_target"
 
 
 def _prepare_fast_render_frames(data, fps=20):
@@ -185,3 +190,59 @@ def materialize_cached_motion_side_by_side_render(
 
     output_stem = output_name or cache_key
     return _symlink_cached_video(cache_path, Path(output_dir) / f"{output_stem}.mp4")
+
+
+def get_m2t_diff_render_cache_dirs(dataset_root, fps=20):
+    single_render_dir = get_render_cache_dir(
+        dataset_root,
+        task=M2T_DIFF_SINGLE_RENDER_TASK,
+        fps=fps,
+    )
+    return {
+        M2T_DIFF_SOURCE_SUFFIX: single_render_dir / M2T_DIFF_SOURCE_SUFFIX,
+        M2T_DIFF_TARGET_SUFFIX: single_render_dir / M2T_DIFF_TARGET_SUFFIX,
+        M2T_DIFF_SIDE_BY_SIDE_SUFFIX: get_render_cache_dir(
+            dataset_root,
+            task=M2T_DIFF_SIDE_BY_SIDE_RENDER_TASK,
+            fps=fps,
+        ),
+    }
+
+
+def materialize_m2t_diff_motion_artifacts(
+    source_joints,
+    target_joints,
+    dataset_root,
+    output_dir,
+    sample_id,
+    fps=20,
+    method="fast",
+):
+    cache_dirs = get_m2t_diff_render_cache_dirs(dataset_root, fps=fps)
+    materialize_cached_motion_render(
+        source_joints,
+        cache_dir=cache_dirs[M2T_DIFF_SOURCE_SUFFIX],
+        cache_key=sample_id,
+        output_dir=output_dir,
+        output_name=f"{sample_id}_{M2T_DIFF_SOURCE_SUFFIX}",
+        method=method,
+        fps=fps,
+    )
+    materialize_cached_motion_render(
+        target_joints,
+        cache_dir=cache_dirs[M2T_DIFF_TARGET_SUFFIX],
+        cache_key=sample_id,
+        output_dir=output_dir,
+        output_name=f"{sample_id}_{M2T_DIFF_TARGET_SUFFIX}",
+        method=method,
+        fps=fps,
+    )
+    materialize_cached_motion_side_by_side_render(
+        source_joints,
+        target_joints,
+        cache_dir=cache_dirs[M2T_DIFF_SIDE_BY_SIDE_SUFFIX],
+        cache_key=sample_id,
+        output_dir=output_dir,
+        output_name=f"{sample_id}_{M2T_DIFF_SIDE_BY_SIDE_SUFFIX}",
+        fps=fps,
+    )

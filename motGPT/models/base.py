@@ -9,9 +9,7 @@ from collections import OrderedDict
 from motGPT.metrics import BaseMetrics
 from motGPT.config import get_obj_from_str
 from motGPT.utils.render_utils import (
-    get_render_cache_dir,
-    materialize_cached_motion_render,
-    materialize_cached_motion_side_by_side_render,
+    materialize_m2t_diff_motion_artifacts,
 )
 import gc
 
@@ -174,21 +172,29 @@ class BaseModel(LightningModule):
             return [text or ""]
         return [str(item) for item in text]
 
+    def _should_save_test_outputs(self):
+        cfg = self.hparams.cfg
+        return cfg.TEST.SAVE_PREDICTIONS or getattr(cfg.TEST, "VISUALIZE", False)
+
+    def _get_test_output_dir(self):
+        cfg = self.hparams.cfg
+        return Path(
+            os.path.join(
+                cfg.FOLDER,
+                str(cfg.model.target.split(".")[-2].lower()),
+                str(cfg.NAME),
+                "samples_" + cfg.TIME,
+            )
+        )
+
+    def _save_text_file(self, path, lines):
+        np.savetxt(path, np.array(lines), fmt="%s")
+
     def _save_m2t_diff_test_artifacts(self, output_dir, outputs):
         from tqdm import tqdm
 
         visualize = getattr(self.hparams.cfg.TEST, "VISUALIZE", False)
-        render_cache_root = Path(self.datamodule.hparams.motionfix_root)
-        single_render_cache_dir = get_render_cache_dir(
-            render_cache_root,
-            task="m2t_diff_single",
-            fps=self.datamodule.fps,
-        )
-        side_by_side_render_cache_dir = get_render_cache_dir(
-            render_cache_root,
-            task="m2t_diff_side_by_side",
-            fps=self.datamodule.fps,
-        )
+        render_cache_root = self.datamodule.hparams.motionfix_root
 
         for batch_outputs in tqdm(outputs):
             pred_texts = batch_outputs["pred_texts"]
@@ -204,8 +210,8 @@ class BaseModel(LightningModule):
                 pred_text = str(pred_texts[bid])
                 gt_text = self._normalize_text_list(gt_texts[bid])
 
-                np.savetxt(output_dir / f"{fname}.txt", np.array([pred_text]), fmt="%s")
-                np.savetxt(output_dir / f"{fname}_gt.txt", np.array(gt_text), fmt="%s")
+                self._save_text_file(output_dir / f"{fname}.txt", [pred_text])
+                self._save_text_file(output_dir / f"{fname}_gt.txt", gt_text)
 
                 if not visualize:
                     continue
@@ -215,139 +221,82 @@ class BaseModel(LightningModule):
                 target_joints = self.feats2joints(self.datamodule.renorm4m(target_feat))
                 source_joints = self.feats2joints(self.datamodule.renorm4m(source_feat))
 
-                materialize_cached_motion_render(
-                    source_joints,
-                    cache_dir=single_render_cache_dir / "source",
-                    cache_key=fname,
-                    output_dir=output_dir,
-                    output_name=f"{fname}_source",
-                    method="fast",
-                    fps=self.datamodule.fps,
-                )
-                materialize_cached_motion_render(
-                    target_joints,
-                    cache_dir=single_render_cache_dir / "target",
-                    cache_key=fname,
-                    output_dir=output_dir,
-                    output_name=f"{fname}_target",
-                    method="fast",
-                    fps=self.datamodule.fps,
-                )
-                materialize_cached_motion_side_by_side_render(
+                materialize_m2t_diff_motion_artifacts(
                     source_joints,
                     target_joints,
-                    cache_dir=side_by_side_render_cache_dir,
-                    cache_key=fname,
+                    dataset_root=render_cache_root,
                     output_dir=output_dir,
-                    output_name=f"{fname}_source_target",
+                    sample_id=fname,
                     fps=self.datamodule.fps,
                 )
+
+    def _save_legacy_test_artifacts(self, output_dir, outputs):
+        lengths = [i[1] for i in outputs]
+        gt_feats = [i[2] for i in outputs]
+        texts = [i[3] for i in outputs]
+        fnames = [i[4] for i in outputs]
+        outputs = [i[0] for i in outputs]
+        test_type = "m2t" if isinstance(outputs[0][0], str) else "t2m"
+
+        if self.datamodule.name.lower() in ["humanml3d", "kit", "motionx"]:
+            from tqdm import tqdm
+
+            for i in tqdm(range(len(outputs))):
+                for bid in range(
+                    min(self.hparams.cfg.TEST.BATCH_SIZE, len(outputs[i]))
+                ):
+                    text = texts[i][bid]
+                    fname = fnames[i][bid].split("/")[-1]
+                    if test_type == "m2t":
+                        pred_text = outputs[i][bid]
+                        text.append(pred_text)
+                        text_list = text
+                    else:
+                        text_list = [text]
+
+                    self._save_text_file(output_dir / f"{fname}.txt", text_list)
+
+                    if test_type == "t2m":
+                        gen_feats = outputs[i][bid][: lengths[i][bid]]
+                        gen_feats = (
+                            self.datamodule.denormalizefromt2m(gen_feats).cpu().numpy()
+                        )
+                        np.save(output_dir / f"{fname}.npy", gen_feats)
+
+                    gt_feat = gt_feats[i][bid][: lengths[i][bid]]
+                    gt_feat = self.datamodule.denormalizefromt2m(gt_feat).cpu().numpy()
+                    np.save(output_dir / f"{fname}_gt.npy", gt_feat)
+
+        elif self.hparams.cfg.TEST.DATASETS[0].lower() in ["humanact12", "uestc"]:
+            assert False
+            keyids = range(len(self.trainer.datamodule.test_dataset))
+            for i in range(len(outputs)):
+                for bid in range(
+                    min(self.hparams.cfg.TEST.BATCH_SIZE, outputs[i].shape[0])
+                ):
+                    keyid = keyids[i * self.hparams.cfg.TEST.BATCH_SIZE + bid]
+                    gen_joints = outputs[i][bid].cpu()
+                    gen_joints = gen_joints.permute(2, 0, 1)[
+                        : lengths[i][bid], ...
+                    ].numpy()
+                    if self.hparams.cfg.TEST.REPLICATION_TIMES > 1:
+                        name = f"{keyid}_{self.rep_i}"
+                    else:
+                        name = f"{keyid}.npy"
+                    np.save(output_dir / name, gen_joints)
 
     def save_npy(self, outputs):
-        cfg = self.hparams.cfg
-        output_dir = Path(
-            os.path.join(
-                cfg.FOLDER,
-                str(cfg.model.target.split(".")[-2].lower()),
-                str(cfg.NAME),
-                "samples_" + cfg.TIME,
-            )
-        )
-        # output_dir = self.output_dir
-        if cfg.TEST.SAVE_PREDICTIONS or getattr(cfg.TEST, "VISUALIZE", False):
-            os.makedirs(output_dir, exist_ok=True)
-            if (
-                outputs
-                and isinstance(outputs[0], dict)
-                and outputs[0].get("task") == "m2t_diff"
-            ):
-                self._save_m2t_diff_test_artifacts(output_dir, outputs)
-                return
+        if not self._should_save_test_outputs():
+            return
 
-            # print(len(outputs[0]))
-            lengths = [i[1] for i in outputs]
-            gt_feats = [i[2] for i in outputs]
-            texts = [i[3] for i in outputs]
-            fnames = [i[4] for i in outputs]
-            outputs = [i[0] for i in outputs]
-            if isinstance(outputs[0][0], str):
-                test_type = "m2t"
-            else:
-                test_type = "t2m"
+        output_dir = self._get_test_output_dir()
+        os.makedirs(output_dir, exist_ok=True)
+        if (
+            outputs
+            and isinstance(outputs[0], dict)
+            and outputs[0].get("task") == "m2t_diff"
+        ):
+            self._save_m2t_diff_test_artifacts(output_dir, outputs)
+            return
 
-            # if cfg.TEST.DATASETS[0].lower() in ["humanml3d", "kit"]:
-            if self.datamodule.name.lower() in ["humanml3d", "kit", "motionx"]:
-                # if True:
-                keyids = self.trainer.datamodule.test_dataset.name_list
-                from tqdm import tqdm
-
-                for i in tqdm(range(len(outputs))):
-                    # print(i, min(cfg.TEST.BATCH_SIZE, outputs[i].shape[0]))
-                    for bid in range(min(cfg.TEST.BATCH_SIZE, len(outputs[i]))):
-                        # try:
-                        text = texts[i][bid]
-                        fname = fnames[i][bid].split("/")[-1]
-                        if test_type == "m2t":
-                            pred_text = outputs[i][bid]
-                            text.append(pred_text)
-                            text_list = text
-                        else:
-                            text_list = [text]
-                        # except:
-                        #     print(len(texts), len(texts[i]), i, bid)
-                        #     exit()
-                        txtpath = output_dir / f"{fname}.txt"
-                        np.savetxt(txtpath, np.array(text_list), fmt="%s")
-
-                        if test_type == "t2m":
-                            gen_feats = outputs[i][bid][: lengths[i][bid]]
-                            gen_joints = (
-                                self.feats2joints(torch.tensor(gen_feats)).cpu().numpy()
-                            )
-                            gen_feats = (
-                                self.datamodule.denormalizefromt2m(gen_feats)
-                                .cpu()
-                                .numpy()
-                            )
-                            npypath = output_dir / f"{fname}.npy"
-                            np.save(npypath, gen_feats)
-
-                        gt_feat = gt_feats[i][bid][: lengths[i][bid]]
-                        gt_joints = (
-                            self.feats2joints(torch.tensor(gt_feat)).cpu().numpy()
-                        )
-                        gt_feat = (
-                            self.datamodule.denormalizefromt2m(gt_feat).cpu().numpy()
-                        )
-                        npypath = output_dir / f"{fname}_gt.npy"
-                        np.save(npypath, gt_feat)
-
-                        # if cfg.TEST.REPLICATION_TIMES > 1:
-                        #     name = f"{fname}.npy"
-                        # else:
-                        #     name = f"{fname}.npy"
-                        # if bid == 0:
-                        #     from motGPT.utils.render_utils import render_motion
-                        #     render_motion(gen_joints, gen_joints, output_dir=output_dir, fname=f'{fname}')
-                        #     render_motion(gt_joints, gt_joints, output_dir=output_dir, fname=f'{fname}_gt')
-                        # # save predictions results
-                        # npypath = output_dir / f"{fname}_joints.npy"
-                        # np.save(npypath, gen_joints)
-
-            elif cfg.TEST.DATASETS[0].lower() in ["humanact12", "uestc"]:
-                assert False
-                keyids = range(len(self.trainer.datamodule.test_dataset))
-                for i in range(len(outputs)):
-                    for bid in range(min(cfg.TEST.BATCH_SIZE, outputs[i].shape[0])):
-                        keyid = keyids[i * cfg.TEST.BATCH_SIZE + bid]
-                        gen_joints = outputs[i][bid].cpu()
-                        gen_joints = gen_joints.permute(2, 0, 1)[
-                            : lengths[i][bid], ...
-                        ].numpy()
-                        if cfg.TEST.REPLICATION_TIMES > 1:
-                            name = f"{keyid}_{self.rep_i}"
-                        else:
-                            name = f"{keyid}.npy"
-                        # save predictions results
-                        npypath = output_dir / name
-                        np.save(npypath, gen_joints)
+        self._save_legacy_test_artifacts(output_dir, outputs)

@@ -51,7 +51,7 @@ def main():
     output_dir = Path(
         os.path.join(cfg.FOLDER, model_name, cfg.NAME, "samples_" + cfg.TIME)
     )
-    if cfg.TEST.SAVE_PREDICTIONS:
+    if cfg.TEST.SAVE_PREDICTIONS or getattr(cfg.TEST, "VISUALIZE", False):
         output_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Saving predictions to {str(output_dir)}")
 

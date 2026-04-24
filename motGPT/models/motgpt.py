@@ -13,11 +13,8 @@ import json
 
 # import motGPT.render.matplot.plot_3d_global as plot_3d
 from motGPT.utils.render_utils import (
-    get_render_cache_dir,
-    materialize_cached_motion_render,
-    materialize_cached_motion_side_by_side_render,
+    materialize_m2t_diff_motion_artifacts,
     render_motion,
-    render_motion_side_by_side,
 )
 
 
@@ -699,50 +696,18 @@ class MotGPT(BaseModel):
                             self.datamodule.renorm4m(feat_ref)
                         )
                         if self.hparams.task == "m2t_diff":
-                            render_cache_root = Path(
-                                self.datamodule.hparams.motionfix_root
-                            )
-                            single_render_cache_dir = get_render_cache_dir(
-                                render_cache_root,
-                                task="m2t_diff_single",
-                                fps=self.datamodule.fps,
-                            )
-                            side_by_side_render_cache_dir = get_render_cache_dir(
-                                render_cache_root,
-                                task="m2t_diff_side_by_side",
-                                fps=self.datamodule.fps,
-                            )
                             source_lengths = rs_set["length_source"]
                             feats_source = rs_set["m_source"]
                             feat_source = feats_source[idx][: source_lengths[idx]]
                             joint_source = self.feats2joints(
                                 self.datamodule.renorm4m(feat_source)
                             )
-                            materialize_cached_motion_render(
-                                joint_source,
-                                cache_dir=single_render_cache_dir / "source",
-                                cache_key=keyid,
-                                output_dir=output_dir,
-                                output_name=f"{keyid}_source",
-                                method="fast",
-                                fps=self.datamodule.fps,
-                            )
-                            materialize_cached_motion_render(
-                                joint_ref,
-                                cache_dir=single_render_cache_dir / "target",
-                                cache_key=keyid,
-                                output_dir=output_dir,
-                                output_name=f"{keyid}_target",
-                                method="fast",
-                                fps=self.datamodule.fps,
-                            )
-                            materialize_cached_motion_side_by_side_render(
+                            materialize_m2t_diff_motion_artifacts(
                                 joint_source,
                                 joint_ref,
-                                cache_dir=side_by_side_render_cache_dir,
-                                cache_key=keyid,
+                                dataset_root=self.datamodule.hparams.motionfix_root,
                                 output_dir=output_dir,
-                                output_name=f"{keyid}_source_target",
+                                sample_id=keyid,
                                 fps=self.datamodule.fps,
                             )
                         else:
