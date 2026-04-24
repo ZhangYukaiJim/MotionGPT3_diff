@@ -38,7 +38,7 @@ The system SHALL provide a stage-4 finetuning configuration for the two-motion-t
 - **THEN** the config explicitly defines guidance settings required for checkpoint compatibility instead of relying on implicit defaults
 
 ### Requirement: Two-motion evaluation can run through existing non-web entry points
-The system SHALL support evaluating or smoke-testing the two-motion text task through config-driven scripts and helper entry points before any Gradio integration is required.
+The system SHALL support evaluating or smoke-testing the two-motion text task through config-driven scripts and helper entry points before any Gradio integration is required, including optional qualitative artifact export for `m2t_diff` test runs.
 
 #### Scenario: Run qualitative paired-motion generation from scripts
 - **WHEN** a developer runs a dedicated two-motion helper script with two `.npy` feature files and a config path
@@ -55,3 +55,7 @@ The system SHALL support evaluating or smoke-testing the two-motion text task th
 #### Scenario: Existing single-motion retrieval metrics are not treated as pair-aware evaluation
 - **WHEN** a developer reviews quantitative `m2t_diff` results from the standard evaluation entry points
 - **THEN** the reported primary metrics exclude single-motion retrieval scores unless a dedicated pair-aware retrieval evaluator has been added
+
+#### Scenario: `m2t_diff` test runs can export qualitative paired-motion artifacts
+- **WHEN** a developer enables qualitative export for a config-driven `m2t_diff` test run
+- **THEN** the standard non-web evaluation entry point can save paired-motion videos and caption files for the exported test samples alongside quantitative results

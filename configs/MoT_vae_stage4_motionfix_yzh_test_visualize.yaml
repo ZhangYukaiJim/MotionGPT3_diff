@@ -1,0 +1,85 @@
+NAME: MoT_vae_stage4_motionfix_yzh_test_visualize
+ACCELERATOR: 'gpu'
+NUM_NODES: 1
+DEVICE: [0]
+
+lm_ablation:
+  motion_holder_repeat: 4
+  holder_num_in_input: 4
+  motion_holder_seq_mode: 'withse'
+  with_hid_norm: False
+  with_vae_latent_norm: True
+  multi_hidden: True
+  guidance_scale: 7.5
+  model_guidance_scale: 7.5
+  diffusion_batch_mul: 4
+  guidance_uncondp: 0.1
+  predict_epsilon: True
+  fake_latent_mode: 'learnable_zero'
+  mot_factor: 1.0
+  attention_mode: 'all'
+
+ABLATION:
+  SKIP_CONNECT: True
+  PE_TYPE: mld
+  DIFF_PE_TYPE: mld
+
+TRAIN:
+  STAGE: lm_finetune
+  instruction_type: witht2t
+  NUM_WORKERS: 8
+  BATCH_SIZE: 8
+  END_EPOCH: 300
+  PRETRAINED: checkpoints/motiongpt3.ckpt
+  PRETRAINED_VAE: checkpoints/1222_mld_humanml3d_FID041.ckpt
+
+EVAL:
+  BATCH_SIZE: 8
+  SPLIT: val
+
+TEST:
+  CHECKPOINTS: experiments/motgpt/debug--MoT_vae_stage4_motionfix_yzh/checkpoints/last.ckpt
+  SPLIT: test
+  BATCH_SIZE: 8
+  REPLICATION_TIMES: 1
+  SAVE_PREDICTIONS: true
+  VISUALIZE: true
+
+DATASET:
+  target: motGPT.data.MotionFix.MotionFixDataModule
+  CODE_PATH: TOKENS
+
+METRIC:
+  TYPE: [M2TDiffMetrics]
+  M2T_DIFF:
+    INCLUDE_BERT_F1: true
+    INCLUDE_BLEU: true
+    BERT_DEVICE: cpu
+    BERT_IDF: true
+
+LOSS:
+  LAMBDA_FEATURE: 1.0
+  LAMBDA_VELOCITY: 0.5
+  LAMBDA_COMMIT: 0.02
+  LAMBDA_CLS: 1.0
+  LAMBDA_DIFF: 0.5
+  ABLATION:
+    RECONS_LOSS: 'l1_smooth'
+
+model:
+  target: motGPT.models.motgpt.MotGPT
+  params:
+    condition: 'text'
+    task: 'm2t_diff'
+    lm: ${lm.mot_vae_gpt2}
+    motion_vae: ${vae.mldvae}
+    mot_factor: 1.0
+    attention_mode: 'all'
+    guidance_scale: ${lm_ablation.model_guidance_scale}
+    with_vae_latent_norm: ${lm_ablation.with_vae_latent_norm}
+  diff_loss: ${lm.diffloss}
+
+LOGGER:
+  TYPE: ['tensorboard', 'wandb']
+  ENABLE_TENSORBOARD: false
+  ENABLE_WANDB: false

@@ -795,6 +795,17 @@ class MotGPT(BaseModel):
                 )
                 # pass
             elif self.hparams.task in ["m2t", "m2t_diff"]:
+                if self.hparams.task == "m2t_diff":
+                    return {
+                        "task": "m2t_diff",
+                        "pred_texts": rs_set["t_pred"],
+                        "target_lengths": rs_set["length"],
+                        "target_feats": rs_set["m_ref"],
+                        "source_lengths": rs_set["length_source"],
+                        "source_feats": rs_set["m_source"],
+                        "gt_texts": rs_set["t_ref"],
+                        "fnames": batch["fname"],
+                    }
                 return (
                     rs_set["t_pred"],
                     batch["length"],

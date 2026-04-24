@@ -8,6 +8,11 @@ from os.path import join as pjoin
 from collections import OrderedDict
 from motGPT.metrics import BaseMetrics
 from motGPT.config import get_obj_from_str
+from motGPT.utils.render_utils import (
+    get_render_cache_dir,
+    materialize_cached_motion_render,
+    materialize_cached_motion_side_by_side_render,
+)
 import gc
 
 
@@ -164,6 +169,80 @@ class BaseModel(LightningModule):
     def configure_metrics(self):
         self.metrics = BaseMetrics(datamodule=self.datamodule, **self.hparams)
 
+    def _normalize_text_list(self, text):
+        if isinstance(text, str) or text is None:
+            return [text or ""]
+        return [str(item) for item in text]
+
+    def _save_m2t_diff_test_artifacts(self, output_dir, outputs):
+        from tqdm import tqdm
+
+        visualize = getattr(self.hparams.cfg.TEST, "VISUALIZE", False)
+        render_cache_root = Path(self.datamodule.hparams.motionfix_root)
+        single_render_cache_dir = get_render_cache_dir(
+            render_cache_root,
+            task="m2t_diff_single",
+            fps=self.datamodule.fps,
+        )
+        side_by_side_render_cache_dir = get_render_cache_dir(
+            render_cache_root,
+            task="m2t_diff_side_by_side",
+            fps=self.datamodule.fps,
+        )
+
+        for batch_outputs in tqdm(outputs):
+            pred_texts = batch_outputs["pred_texts"]
+            target_lengths = batch_outputs["target_lengths"]
+            target_feats = batch_outputs["target_feats"]
+            source_lengths = batch_outputs["source_lengths"]
+            source_feats = batch_outputs["source_feats"]
+            gt_texts = batch_outputs["gt_texts"]
+            fnames = batch_outputs["fnames"]
+
+            for bid in range(len(pred_texts)):
+                fname = fnames[bid].split("/")[-1]
+                pred_text = str(pred_texts[bid])
+                gt_text = self._normalize_text_list(gt_texts[bid])
+
+                np.savetxt(output_dir / f"{fname}.txt", np.array([pred_text]), fmt="%s")
+                np.savetxt(output_dir / f"{fname}_gt.txt", np.array(gt_text), fmt="%s")
+
+                if not visualize:
+                    continue
+
+                target_feat = target_feats[bid][: target_lengths[bid]]
+                source_feat = source_feats[bid][: source_lengths[bid]]
+                target_joints = self.feats2joints(self.datamodule.renorm4m(target_feat))
+                source_joints = self.feats2joints(self.datamodule.renorm4m(source_feat))
+
+                materialize_cached_motion_render(
+                    source_joints,
+                    cache_dir=single_render_cache_dir / "source",
+                    cache_key=fname,
+                    output_dir=output_dir,
+                    output_name=f"{fname}_source",
+                    method="fast",
+                    fps=self.datamodule.fps,
+                )
+                materialize_cached_motion_render(
+                    target_joints,
+                    cache_dir=single_render_cache_dir / "target",
+                    cache_key=fname,
+                    output_dir=output_dir,
+                    output_name=f"{fname}_target",
+                    method="fast",
+                    fps=self.datamodule.fps,
+                )
+                materialize_cached_motion_side_by_side_render(
+                    source_joints,
+                    target_joints,
+                    cache_dir=side_by_side_render_cache_dir,
+                    cache_key=fname,
+                    output_dir=output_dir,
+                    output_name=f"{fname}_source_target",
+                    fps=self.datamodule.fps,
+                )
+
     def save_npy(self, outputs):
         cfg = self.hparams.cfg
         output_dir = Path(
@@ -175,8 +254,16 @@ class BaseModel(LightningModule):
             )
         )
         # output_dir = self.output_dir
-        if cfg.TEST.SAVE_PREDICTIONS:
+        if cfg.TEST.SAVE_PREDICTIONS or getattr(cfg.TEST, "VISUALIZE", False):
             os.makedirs(output_dir, exist_ok=True)
+            if (
+                outputs
+                and isinstance(outputs[0], dict)
+                and outputs[0].get("task") == "m2t_diff"
+            ):
+                self._save_m2t_diff_test_artifacts(output_dir, outputs)
+                return
+
             # print(len(outputs[0]))
             lengths = [i[1] for i in outputs]
             gt_feats = [i[2] for i in outputs]

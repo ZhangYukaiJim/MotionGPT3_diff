@@ -224,12 +224,33 @@ uv run python scripts/compare_two_motions_prompt.py \
   --max-length 40
 ```
 
+Export qualitative `m2t_diff` test artifacts through `test.py`:
+
+```yaml
+TEST:
+  SAVE_PREDICTIONS: true
+  VISUALIZE: true
+```
+
+```bash
+uv run python -m test \
+  --cfg configs/MoT_vae_stage4_motionfix_yzh_resume_debug.yaml \
+  --cfg_assets configs/assets_humanml3d_yzh.yaml \
+  --batch_size 8
+```
+
+This writes test outputs under `results/<model>/<NAME>/samples_<TIME>/`, including:
+- `<id>.txt` for the predicted caption
+- `<id>_gt.txt` for ground-truth caption text
+- `<id>_source.mp4`, `<id>_target.mp4`, and `<id>_source_target.mp4` when `TEST.VISUALIZE: true`
+
 Notes:
 
 - The current MotionFix path is script and training oriented; it does not add a Gradio web UI workflow.
 - The paired-motion task uses `m2t_diff` and continues from `checkpoints/motiongpt3.ckpt` with guidance settings compatible with `lm.fake_latent`.
 - The first implementation uses HumanML normalization intentionally, so the pretrained HumanML VAE can be reused without changing its expected input distribution.
 - Validation visualizations now default to the first `VIS_NUM` items from the first validation batch. Set `VAL_VIS_IDS` in config to a list of dataset ids if you want a fixed curated subset instead.
+- `TEST.SAVE_PREDICTIONS` controls raw test artifact export, while `TEST.VISUALIZE` controls MotionFix `m2t_diff` video materialization during `test.py`.
 - Recommended `m2t_diff` evaluation uses `METRIC.TYPE: [M2TDiffMetrics]`, which reports `Bert_F1`, `ROUGE_L`, `CIDEr`, `Bleu_1`, `Bleu_4`, `Empty_output_rate`, and `Avg_generated_length`.
 - These `Metrics/*` values are logged through Lightning and will appear in TensorBoard and WandB when those loggers are enabled.
 - `Bert_F1` uses a TorchMetrics-based BERTScore path with local device-placement fixes for MotionFix evaluation. Validated configs can use `METRIC.M2T_DIFF.BERT_DEVICE: cpu` or `cuda:0`; `METRIC.M2T_DIFF.BERT_IDF` defaults to `true` and remains configurable alongside `INCLUDE_BERT_F1` and `INCLUDE_BLEU`.
