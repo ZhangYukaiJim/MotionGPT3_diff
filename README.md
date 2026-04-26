@@ -244,13 +244,31 @@ This writes test outputs under `results/<model>/<NAME>/samples_<TIME>/`, includi
 - `<id>_gt.txt` for ground-truth caption text
 - `<id>_source.mp4`, `<id>_target.mp4`, and `<id>_source_target.mp4` when `TEST.VISUALIZE: true`
 
+Browse exported MotionFix `m2t_diff` samples in a separate local browser:
+
+```bash
+uv run --extra webui python app_m2t_diff_browser.py \
+  --sample-dir results/motgpt/MoT_vae_stage4_motionfix_yzh_test_visualize/samples_2026-04-23-16-15-57
+```
+
+If `--sample-dir` is omitted, the browser picks the newest `samples_<TIME>` directory under `results/motgpt/` automatically.
+
+The browser is gallery-first and shows:
+- a paginated grid of samples using `<id>_source_target.mp4` as the preview when available
+- a detail panel with source, target, and side-by-side videos plus full generated and ground-truth text
+- keyboard shortcuts: left/right for page navigation, `j`/`k` for sample navigation, and `f` to toggle favorites
+
+Favorites are saved in a sidecar file named `.m2t_diff_browser_favorites.json` inside the browsed sample directory. The browser only reads existing sample artifacts and does not modify the exported text or video files.
+
 Notes:
 
 - The current MotionFix path is script and training oriented; it does not add a Gradio web UI workflow.
+- `app_m2t_diff_browser.py` is a separate result browser for exported samples, not an extension of the inference-heavy `app.py` web UI.
 - The paired-motion task uses `m2t_diff` and continues from `checkpoints/motiongpt3.ckpt` with guidance settings compatible with `lm.fake_latent`.
 - The first implementation uses HumanML normalization intentionally, so the pretrained HumanML VAE can be reused without changing its expected input distribution.
 - Validation visualizations now default to the first `VIS_NUM` items from the first validation batch. Set `VAL_VIS_IDS` in config to a list of dataset ids if you want a fixed curated subset instead.
 - `TEST.SAVE_PREDICTIONS` controls raw test artifact export, while `TEST.VISUALIZE` controls MotionFix `m2t_diff` video materialization during `test.py`.
+- The result browser tolerates partial exports, so samples with text but missing videos remain visible in the gallery and detail panel.
 - Recommended `m2t_diff` evaluation uses `METRIC.TYPE: [M2TDiffMetrics]`, which reports `Bert_F1`, `ROUGE_L`, `CIDEr`, `Bleu_1`, `Bleu_4`, `Empty_output_rate`, and `Avg_generated_length`.
 - These `Metrics/*` values are logged through Lightning and will appear in TensorBoard and WandB when those loggers are enabled.
 - `Bert_F1` uses a TorchMetrics-based BERTScore path with local device-placement fixes for MotionFix evaluation. Validated configs can use `METRIC.M2T_DIFF.BERT_DEVICE: cpu` or `cuda:0`; `METRIC.M2T_DIFF.BERT_IDF` defaults to `true` and remains configurable alongside `INCLUDE_BERT_F1` and `INCLUDE_BLEU`.
