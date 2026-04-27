@@ -230,7 +230,11 @@ Export qualitative `m2t_diff` test artifacts through `test.py`:
 TEST:
   SAVE_PREDICTIONS: true
   VISUALIZE: true
+  VISUALIZE_RENDER_METHOD: fast
 ```
+
+Set `TEST.VISUALIZE_RENDER_METHOD: slow` to use the slower SMPL-based renderer for all three exported MotionFix videos: `<id>_source.mp4`, `<id>_target.mp4`, and `<id>_source_target.mp4`.
+This slow path requires the render dependencies from `uv sync --extra render` and the SMPL assets from `bash prepare/download_smpl_model.sh`.
 
 ```bash
 uv run python -m test \
@@ -243,6 +247,8 @@ This writes test outputs under `results/<model>/<NAME>/samples_<TIME>/`, includi
 - `<id>.txt` for the predicted caption
 - `<id>_gt.txt` for ground-truth caption text
 - `<id>_source.mp4`, `<id>_target.mp4`, and `<id>_source_target.mp4` when `TEST.VISUALIZE: true`
+
+MotionFix render caches stay separate by render method, so `fast` and `slow` runs do not overwrite or reuse each other's cached videos under `<motionfix-root>/render_cache/`.
 
 Browse exported MotionFix `m2t_diff` samples in a separate local browser:
 

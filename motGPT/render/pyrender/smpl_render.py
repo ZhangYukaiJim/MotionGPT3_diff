@@ -14,6 +14,10 @@ from shapely import geometry
 from scipy.spatial.transform.rotation import Rotation as RRR
 
 
+if not os.environ.get("DISPLAY"):
+    os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+
+
 if not hasattr(np, "bool"):
     np.bool = np.bool_
 if not hasattr(np, "int"):

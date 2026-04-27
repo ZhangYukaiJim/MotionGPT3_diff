@@ -1,8 +1,4 @@
-## Purpose
-
-Define config-driven qualitative test export for MotionFix `m2t_diff` evaluation.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: `m2t_diff` test runs can materialize paired-motion qualitative artifacts
 The system SHALL provide a config-driven `test.py` path for `m2t_diff` that can save qualitative artifacts for test samples, including source motion video, target motion video, side-by-side source-target video, predicted text, and ground-truth text.

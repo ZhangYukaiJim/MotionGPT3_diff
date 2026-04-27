@@ -194,6 +194,9 @@ class BaseModel(LightningModule):
         from tqdm import tqdm
 
         visualize = getattr(self.hparams.cfg.TEST, "VISUALIZE", False)
+        render_method = getattr(
+            self.hparams.cfg.TEST, "VISUALIZE_RENDER_METHOD", "fast"
+        )
         render_cache_root = self.datamodule.hparams.motionfix_root
 
         for batch_outputs in tqdm(outputs):
@@ -228,6 +231,7 @@ class BaseModel(LightningModule):
                     output_dir=output_dir,
                     sample_id=fname,
                     fps=self.datamodule.fps,
+                    method=render_method,
                 )
 
     def _save_legacy_test_artifacts(self, output_dir, outputs):
