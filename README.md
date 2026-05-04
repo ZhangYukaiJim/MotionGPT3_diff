@@ -259,6 +259,31 @@ uv run --extra webui python app_m2t_diff_browser.py \
 
 If `--sample-dir` is omitted, the browser picks the newest `samples_<TIME>` directory under `results/motgpt/` automatically.
 
+Prototype a DTW-aligned vertex heat overlay for one MotionFix pair:
+
+```bash
+uv run --extra render python scripts/prototype_m2t_diff_heat_overlay.py \
+  --cfg configs/MoT_vae_stage4_motionfix_yzh.yaml \
+  --sample-id 000000 \
+  --split test
+```
+
+Or run it directly on cached feature files:
+
+```bash
+uv run --extra render python scripts/prototype_m2t_diff_heat_overlay.py \
+  --source /opt/data/motionfix-dataset/mgpt_humanml_cache/source/000000.npy \
+  --target /opt/data/motionfix-dataset/mgpt_humanml_cache/target/000000.npy
+```
+
+The prototype writes a self-contained artifact directory containing:
+- `alignment_cost_matrix.png`, `alignment_path_plot.png`, and `alignment_scalar_traces.png`
+- `alignment_preview.mp4` and `alignment_pairs.npz`
+- `vertex_heat_overlay.mp4`, `vertex_heat_contact_sheet.png`, and `vertex_heat_values.npz`
+- `prototype_metadata.json`
+
+The current prototype is intentionally isolated from `test.py` and `app_m2t_diff_browser.py`. It uses constrained DTW on root-centered 22-joint motions for temporal alignment, then renders the source mesh with per-vertex heat while showing the target as a translucent ghost. Because the comparison is root-centered, the overlay emphasizes pose differences and does not fully represent global translation or path differences.
+
 The browser is gallery-first and shows:
 - a paginated grid of samples using `<id>_source_target.mp4` as the preview when available
 - a detail panel with source, target, and side-by-side videos plus full generated and ground-truth text
